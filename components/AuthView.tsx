@@ -15,8 +15,12 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
 
   const clearAllData = () => {
     if (confirm("This will delete all accounts and scores stored in this browser. Continue?")) {
-      localStorage.clear();
-      window.location.reload();
+      try {
+        localStorage.clear();
+        window.location.reload();
+      } catch (e) {
+        alert("Force reload failed. Please clear browsing data manually in browser settings.");
+      }
     }
   };
 
@@ -44,21 +48,31 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
         }
       }
 
+      const normalizedEmail = email.toLowerCase().trim();
+
       if (isLogin) {
-        const user = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+        const user = users.find((u: any) => u.email.toLowerCase().trim() === normalizedEmail && u.password === password);
         if (user) {
-          onAuthComplete(user);
+          try {
+            onAuthComplete(user);
+          } catch (sessionErr: any) {
+            if (sessionErr.name?.includes('Quota') || sessionErr.message?.includes('quota')) {
+              setError('Session storage full. Please wipe local data.');
+            } else {
+              setError('Session error. Try again.');
+            }
+          }
         } else {
           setError('Authentication failed. Check credentials.');
         }
       } else {
-        const existing = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+        const existing = users.find((u: any) => u.email.toLowerCase().trim() === normalizedEmail);
         if (existing) {
-          setError('Subject ID exists. Try logging in.');
+          setError('Account already exists. Try logging in.');
         } else {
           const newUser: User = {
             id: Math.random().toString(36).substring(2, 11),
-            email,
+            email: normalizedEmail,
             password,
           };
           users.push(newUser);
@@ -67,17 +81,21 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
             localStorage.setItem('users', JSON.stringify(users));
             onAuthComplete(newUser);
           } catch (storageError: any) {
-            if (storageError.name === 'QuotaExceededError' || storageError.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-              setError('Storage quota exceeded. Please clear browsing data.');
+            if (storageError.name?.includes('Quota') || storageError.message?.includes('quota') || storageError.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+              setError('Storage quota exceeded. Your browser storage is full.');
             } else {
               throw storageError;
             }
           }
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Auth system failure:", err);
-      setError('System storage error. Storage might be full.');
+      if (err.name?.includes('Quota') || err.message?.includes('quota')) {
+        setError('Storage is full. Cannot save new data.');
+      } else {
+        setError('System storage error. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -138,11 +156,9 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
                <span className="material-icons-round text-destructive text-sm">error</span>
                <p className="text-destructive text-[10px] font-bold uppercase tracking-widest leading-none flex-grow">{error}</p>
             </div>
-            {error.includes('Storage') && (
-              <Button onClick={clearAllData} type="button" variant="secondary" size="sm" className="w-full text-[9px] py-2 uppercase tracking-widest border-destructive/20 text-destructive hover:bg-destructive/10">
-                Wipe Local Data & Reset
-              </Button>
-            )}
+            <Button onClick={clearAllData} type="button" variant="secondary" size="sm" className="w-full text-[9px] py-2 uppercase tracking-widest border-destructive/20 text-destructive hover:bg-destructive/10">
+              Emergency Reset: Wipe Local Data
+            </Button>
           </div>
         )}
 

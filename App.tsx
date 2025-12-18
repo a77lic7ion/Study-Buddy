@@ -48,7 +48,9 @@ const App: React.FC = () => {
         setCurrentView(user.profile ? AppView.HOME : AppView.SETUP);
       } catch (e) {
         console.error("Corrupted user data found, resetting...", e);
-        localStorage.removeItem('currentUser');
+        try {
+          localStorage.removeItem('currentUser');
+        } catch (err) {}
         setCurrentView(AppView.AUTH);
       }
     } else if (hasSeenIntro) {
@@ -89,8 +91,12 @@ const App: React.FC = () => {
     setCurrentUser(user);
     try {
       localStorage.setItem('currentUser', JSON.stringify(user));
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to persist session", e);
+      // Even if persistence fails, we let them into the app for the current session
+      if (e.name?.includes('Quota') || e.message?.includes('quota')) {
+        alert("Warning: Browser storage is full. Your progress might not be saved across reloads.");
+      }
     }
     setCurrentView(user.profile ? AppView.HOME : AppView.SETUP);
   };
