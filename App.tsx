@@ -15,6 +15,7 @@ import SettingsView from './components/SettingsView';
 
 const DEFAULT_API_SETTINGS: ApiSettings = {
   activeProvider: 'gemini',
+  automaticFailover: true,
   providers: {
     gemini: {
       baseUrl: '',
@@ -68,12 +69,12 @@ const App: React.FC = () => {
   const [apiSettings, setApiSettings] = useState<ApiSettings>(DEFAULT_API_SETTINGS);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [remediationMode, setRemediationMode] = useState(false);
+  const [notification, setNotification] = useState<string | null>(null);
 
   const getStoredItem = (key: string) => {
     try {
       return localStorage.getItem(key);
     } catch (e) {
-      console.warn(`LocalStorage access failed for key: ${key}`, e);
       return null;
     }
   };
@@ -117,7 +118,27 @@ const App: React.FC = () => {
         setApiSettings(JSON.parse(storedSettingsRaw));
       } catch (e) {}
     }
+
+    // Listen for automatic failovers
+    const handleFailover = (e: any) => {
+      const newProvider = e.detail.provider;
+      setNotification(`NEURAL FAILOVER: Primary Core exhausted. Switched to ${newProvider.toUpperCase()}.`);
+      setTimeout(() => setNotification(null), 5000);
+      
+      // Update local state to match persisted change
+      const settings = getStoredSettings();
+      if (settings) setApiSettings(settings);
+    };
+
+    window.addEventListener('neuroforge:provider_switched', handleFailover);
+    return () => window.removeEventListener('neuroforge:provider_switched', handleFailover);
   }, []);
+
+  const getStoredSettings = (): ApiSettings | null => {
+    const saved = localStorage.getItem('apiSettings');
+    if (saved) return JSON.parse(saved);
+    return null;
+  };
 
   const toggleTheme = () => {
     const newMode = !isDarkMode;
@@ -211,7 +232,7 @@ const App: React.FC = () => {
         return (
           <div className="w-full max-w-4xl mx-auto space-y-8 animate-in fade-in zoom-in duration-500">
             <div className="flex flex-col items-center text-center space-y-4">
-              <h1 className="text-4xl md:text-6xl font-black text-foreground tracking-tighter uppercase italic">
+              <h1 className="text-4xl md:text-6xl font-black text-foreground tracking-tighter uppercase italic italic">
                 MASTERY <span className="text-primary italic">COMMAND</span>
               </h1>
               <div className="flex flex-wrap justify-center gap-2">
@@ -226,7 +247,7 @@ const App: React.FC = () => {
                 <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
                   <span className="material-icons-round text-7xl">style</span>
                 </div>
-                <h3 className="text-2xl font-black uppercase italic mb-3 group-hover:text-primary transition-colors">Neural Reciter</h3>
+                <h3 className="text-2xl font-black uppercase italic italic mb-3 group-hover:text-primary transition-colors">Neural Reciter</h3>
                 <p className="text-xs text-muted-foreground font-medium leading-relaxed max-w-xs">Forging deep conceptual recall via AI-synthesized card decks.</p>
                 <div className="mt-8 flex items-center text-primary font-black text-[10px] uppercase tracking-[0.3em]">
                   Initialize Forge <span className="material-icons-round ml-2 text-sm">rocket_launch</span>
@@ -237,7 +258,7 @@ const App: React.FC = () => {
                 <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
                   <span className="material-icons-round text-7xl">bolt</span>
                 </div>
-                <h3 className="text-2xl font-black uppercase italic mb-3 group-hover:text-primary transition-colors">Assessment Lab</h3>
+                <h3 className="text-2xl font-black uppercase italic italic mb-3 group-hover:text-primary transition-colors">Assessment Lab</h3>
                 <p className="text-xs text-muted-foreground font-medium leading-relaxed max-w-xs">Simulated environment for real-time proficiency benchmarking.</p>
                 <div className="mt-8 flex items-center text-primary font-black text-[10px] uppercase tracking-[0.3em]">
                   Start Simulation <span className="material-icons-round ml-2 text-sm">sensors</span>
@@ -280,6 +301,15 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col relative overflow-hidden bg-background">
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] -z-10 opacity-30 pointer-events-none"></div>
       <Header user={currentUser} onLogout={handleLogout} onProfile={() => setCurrentView(AppView.PROFILE)} onSettings={() => setCurrentView(AppView.SETTINGS)} onHome={() => setCurrentView(AppView.HOME)} showNav={currentView !== AppView.INTRO} isDarkMode={isDarkMode} onToggleTheme={toggleTheme} />
+      
+      {/* Fallback Notification Toast */}
+      {notification && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-primary text-white px-6 py-3 rounded-2xl shadow-2xl border border-white/20 animate-in slide-in-from-top-4 duration-500 flex items-center gap-3">
+          <span className="material-icons-round text-lg animate-pulse">sync_problem</span>
+          <span className="text-[10px] font-black uppercase tracking-widest">{notification}</span>
+        </div>
+      )}
+
       <main className="flex-grow flex flex-col px-4 py-8 relative z-0">
         <div className="w-full max-w-6xl mx-auto flex-grow flex items-center justify-center">{renderContent()}</div>
       </main>

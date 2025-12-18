@@ -27,7 +27,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
   const testProvider = async (provider: string) => {
     setTestStatus(prev => ({ ...prev, [provider]: 'testing' }));
     try {
-      // Simulate a small delay for diagnostic feedback
       await new Promise(resolve => setTimeout(resolve, 800));
       const config = localSettings.providers[provider as keyof ApiSettings['providers']];
       
@@ -58,12 +57,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
         const response = await fetch(`${config.baseUrl}/api/tags`).then(r => r.json());
         models = response.models?.map((m: any) => m.name) || [];
       } else if (provider === 'cloudflare') {
-        // Cloudflare doesn't have a standardized 'list models' that is easy to call without account ID
-        // Often users provide their own common ones or manually enter. 
-        // We'll provide a few common Workers AI IDs as defaults if empty.
         models = ['@cf/meta/llama-3-8b-instruct', '@cf/mistral/mistral-7b-instruct-v0.1', '@cf/google/gemma-7b-it'];
       } else {
-        // OpenAI compatible (Mistral, Deepseek, OpenRouter, OpenAI)
         const endpoint = `${config.baseUrl.replace(/\/+$/, '')}/models`;
         const headers: Record<string, string> = {};
         if (config.apiKey) headers['Authorization'] = `Bearer ${config.apiKey}`;
@@ -91,10 +86,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
     'gemini', 'mistral', 'openai', 'ollama', 'cloudflare', 'deepseek', 'openrouter'
   ];
 
+  const handleToggleFailover = () => {
+    setLocalSettings(prev => ({ ...prev, automaticFailover: !prev.automaticFailover }));
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto p-4 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-      <div className="flex items-center justify-between mb-8 sm:mb-10 px-2">
-        <div className="pr-4">
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-8 sm:mb-10 px-2 gap-4">
+        <div>
           <h2 className="text-xl sm:text-3xl font-black text-foreground uppercase italic tracking-tighter leading-none">
             AI <span className="text-primary italic">COMMAND</span>
           </h2>
@@ -102,7 +101,22 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
             NEURAL CORE CONFIG
           </p>
         </div>
-        <Button onClick={onBack} variant="ghost" size="sm" className="flex-shrink-0">RETURN</Button>
+
+        <div className="flex items-center gap-4">
+          <div 
+            onClick={handleToggleFailover}
+            className="flex items-center gap-3 bg-secondary/50 p-2 sm:p-3 rounded-xl border border-border cursor-pointer hover:bg-secondary transition-colors"
+          >
+             <div className="flex flex-col text-right">
+                <span className="text-[8px] font-black uppercase text-muted-foreground leading-none">Failover</span>
+                <span className="text-[10px] font-black uppercase text-primary tracking-widest">{localSettings.automaticFailover ? 'ON' : 'OFF'}</span>
+             </div>
+             <div className={`w-10 h-5 rounded-full relative transition-colors ${localSettings.automaticFailover ? 'bg-primary' : 'bg-muted'}`}>
+                <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${localSettings.automaticFailover ? 'left-6' : 'left-1'}`}></div>
+             </div>
+          </div>
+          <Button onClick={onBack} variant="ghost" size="sm" className="flex-shrink-0">RETURN</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
@@ -118,7 +132,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
                 : 'bg-card border-border text-muted-foreground hover:bg-secondary'
               }`}
             >
-              <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest">{p}</span>
+              <div className="flex flex-col">
+                <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest leading-none mb-1">{p}</span>
+                <span className="text-[7px] opacity-50 font-bold uppercase truncate max-w-[80px]">
+                  {localSettings.providers[p].baseUrl ? 'Configured' : 'Empty'}
+                </span>
+              </div>
               <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full flex-shrink-0 ${testStatus[p] === 'success' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : 'bg-muted-foreground/30'}`}></div>
             </button>
           ))}
@@ -129,7 +148,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
               variant="primary" 
               className="w-full py-5 text-[10px] uppercase tracking-[0.3em] bg-green-600 hover:bg-green-700 shadow-xl"
             >
-              Save Parameters
+              Sync All Cores
             </Button>
           </div>
         </div>
@@ -143,7 +162,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
           <div className="relative z-10 space-y-6 sm:space-y-8">
             <h3 className="text-lg sm:text-xl font-black uppercase italic text-primary flex items-center gap-3 italic">
               <span className="material-icons-round text-xl sm:text-2xl">memory</span>
-              {localSettings.activeProvider} Tuning
+              {localSettings.activeProvider} Core Tuning
             </h3>
 
             <div className="grid grid-cols-1 gap-5 sm:gap-6">
@@ -161,15 +180,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
                         : "https://api.example.com/v1"
                     }
                   />
-                  {localSettings.activeProvider === 'cloudflare' && (
-                      <p className="text-[8px] text-muted-foreground italic uppercase tracking-widest mt-1">Include your Account ID in the URL for native Cloudflare AI calls.</p>
-                  )}
                 </div>
               )}
 
               {localSettings.activeProvider !== 'ollama' && (
                 <div className="space-y-2 sm:space-y-3">
-                  <label className="text-[8px] sm:text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1 leading-none block">API Key / Token</label>
+                  <label className="text-[8px] sm:text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1 leading-none block">Access Key / Token</label>
                   <input 
                     type="password" 
                     value={localSettings.providers[localSettings.activeProvider].apiKey} 
@@ -182,14 +198,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
 
               <div className="space-y-3 sm:space-y-4">
                 <div className="flex items-center justify-between gap-4">
-                  <label className="text-[8px] sm:text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1 leading-none">Model Selection</label>
+                  <label className="text-[8px] sm:text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1 leading-none">Model Index</label>
                   <button 
                     onClick={() => prefetchModels(localSettings.activeProvider)}
                     disabled={fetchStatus[localSettings.activeProvider]}
                     className="text-[8px] sm:text-[9px] font-black uppercase text-primary hover:opacity-70 transition-opacity flex items-center gap-1.5 disabled:opacity-30 whitespace-nowrap"
                   >
                     <span className={`material-icons-round text-sm ${fetchStatus[localSettings.activeProvider] ? 'animate-spin' : ''}`}>sync</span>
-                    {fetchStatus[localSettings.activeProvider] ? 'SYNC...' : 'SYNC'}
+                    {fetchStatus[localSettings.activeProvider] ? 'FETCHING...' : 'SYNC MODELS'}
                   </button>
                 </div>
                 
@@ -203,7 +219,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
                       <option key={m} value={m}>{m}</option>
                     ))}
                     {localSettings.providers[localSettings.activeProvider].availableModels.length === 0 && (
-                      <option value="">No models sync'd.</option>
+                      <option value="">Awaiting Model Sync...</option>
                     )}
                   </select>
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
@@ -220,20 +236,20 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
                 variant="secondary" 
                 className="flex-grow text-[9px] sm:text-[10px] uppercase tracking-widest py-3 sm:py-4"
               >
-                {testStatus[localSettings.activeProvider] === 'testing' ? 'Testing...' : 'Diagnostic'}
+                {testStatus[localSettings.activeProvider] === 'testing' ? 'Diagnostic Run...' : 'Run Diagnostic'}
               </Button>
               
               {testStatus[localSettings.activeProvider] === 'success' && (
                 <div className="bg-green-500/10 border border-green-500/20 px-4 sm:px-6 py-3 sm:py-4 rounded-xl flex items-center gap-3 text-green-500 animate-in fade-in zoom-in duration-300">
                   <span className="material-icons-round text-sm">check_circle</span>
-                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">Link Active</span>
+                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">Neural Link Verified</span>
                 </div>
               )}
               
               {testStatus[localSettings.activeProvider] === 'error' && (
                 <div className="bg-destructive/10 border border-destructive/20 px-4 sm:px-6 py-3 sm:py-4 rounded-xl flex items-center gap-3 text-destructive animate-in shake duration-300">
                   <span className="material-icons-round text-sm">error</span>
-                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">Protocol Fail</span>
+                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">Sync Timeout</span>
                 </div>
               )}
             </div>
@@ -244,7 +260,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
                 variant="primary" 
                 className="w-full py-4 text-[10px] uppercase tracking-[0.2em] bg-green-600 shadow-xl"
               >
-                Save All Parameters
+                Sync All Cores
               </Button>
             </div>
           </div>

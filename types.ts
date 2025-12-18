@@ -55,6 +55,7 @@ export interface ApiProviderConfig {
 
 export interface ApiSettings {
   activeProvider: 'gemini' | 'mistral' | 'openai' | 'ollama' | 'cloudflare' | 'deepseek' | 'openrouter';
+  automaticFailover: boolean;
   providers: {
     gemini: ApiProviderConfig;
     mistral: ApiProviderConfig;
