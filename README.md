@@ -32,6 +32,14 @@ NeuroForge is a high-performance educational platform designed for the modern sc
 
 ---
 
+<img width="580" height="686" alt="image" src="https://github.com/user-attachments/assets/73f3b0e8-762e-4f69-9d66-2e9ffaa5e24e" />
+
+<img width="995" height="792" alt="image" src="https://github.com/user-attachments/assets/6ad55c0d-f5f7-488d-b578-70859d1725e9" />
+
+
+
+
+
 ## 🧠 Technical Architecture
 
 - **Engine:** Built with React 19 and Tailwind CSS, utilizing a custom dual-theme design system.
