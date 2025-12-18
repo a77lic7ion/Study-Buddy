@@ -23,8 +23,8 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <header className="w-full px-6 py-6 flex items-center justify-between z-10 relative">
       <div className="flex items-center gap-3 cursor-pointer group" onClick={onHome}>
-        <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20 ring-1 ring-border group-hover:scale-105 transition-transform">
-          <span className="material-icons-round text-2xl">hardware</span>
+        <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center p-1 shadow-lg shadow-primary/5 ring-1 ring-border group-hover:scale-105 transition-transform overflow-hidden">
+          <img src="/logo.png" alt="NeuroForge Logo" className="w-full h-full object-contain" />
         </div>
         <div className="flex flex-col">
           <h1 className="text-xl font-bold tracking-tight text-foreground leading-none">

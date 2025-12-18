@@ -32,12 +32,16 @@ const IntroSequence: React.FC<IntroSequenceProps> = ({ onComplete }) => {
       </div>
 
       <div className="relative flex flex-col items-center">
-        {/* Animated Central Node */}
+        {/* Animated Central Node featuring logo.png */}
         <div className="relative w-32 h-32 mb-12">
           <div className="absolute inset-0 border-2 border-primary rounded-full animate-ping opacity-20"></div>
           <div className="absolute inset-2 border-2 border-primary/40 rounded-lg animate-spin-slow"></div>
-          <div className="absolute inset-4 bg-primary/20 rounded flex items-center justify-center backdrop-blur-md border border-primary/30">
-            <span className="material-icons-round text-primary text-4xl animate-pulse">hardware</span>
+          <div className="absolute inset-4 bg-primary/10 rounded-xl flex items-center justify-center backdrop-blur-md border border-primary/30 p-4 shadow-2xl shadow-primary/20">
+            <img 
+              src="/logo.png" 
+              alt="NeuroForge Engine Core" 
+              className="w-full h-full object-contain animate-pulse"
+            />
           </div>
         </div>
 
