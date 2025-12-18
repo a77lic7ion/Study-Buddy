@@ -12,9 +12,12 @@ interface QuizProps {
   onTestComplete: (score: number) => void;
 }
 
+type QuestionCount = 10 | 25 | 30;
+
 const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) => {
   const [status, setStatus] = useState<'loading' | 'active' | 'review' | 'intro'>('intro');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [questionCount, setQuestionCount] = useState<QuestionCount>(10);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [score, setScore] = useState(0);
@@ -82,7 +85,7 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
     const topicsArray = focusTopics.split(',').map(t => t.trim()).filter(t => t.length > 0);
     
     try {
-      const qs = await generateQuizQuestions(profile, weakTopics, topicsArray);
+      const qs = await generateQuizQuestions(profile, weakTopics, topicsArray, questionCount);
       setQuestions(qs);
       setScore(0);
       setCurrentIndex(0);
@@ -187,6 +190,25 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
             placeholder="e.g. Algebra, History..."
             className="w-full bg-background border border-border rounded-lg p-3 py-4 text-sm text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-primary outline-none"
           />
+        </div>
+
+        <div className="space-y-3">
+          <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest ml-1">Assessment Size</label>
+          <div className="grid grid-cols-3 gap-2">
+            {([10, 25, 30] as QuestionCount[]).map((count) => (
+              <button
+                key={count}
+                onClick={() => setQuestionCount(count)}
+                className={`py-3 rounded-lg border font-bold text-[10px] uppercase transition-all tracking-wider ${
+                  questionCount === count 
+                    ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20' 
+                    : 'bg-background border-border text-muted-foreground hover:border-primary/50'
+                }`}
+              >
+                {count} Qs
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-col gap-3 pt-4">

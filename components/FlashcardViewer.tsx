@@ -13,12 +13,14 @@ interface FlashcardViewerProps {
 }
 
 type Difficulty = 'Easy' | 'Medium' | 'Hard';
+type CardCount = 10 | 25 | 40;
 
 const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBack, onTestComplete }) => {
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [loading, setLoading] = useState(false);
   const [preSetup, setPreSetup] = useState(true);
   const [difficulty, setDifficulty] = useState<Difficulty>('Medium');
+  const [cardCount, setCardCount] = useState<CardCount>(10);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
@@ -55,7 +57,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
     setLoading(true);
     setPreSetup(false);
     try {
-      const aiCards = await generateFlashcards(profile, difficulty);
+      const aiCards = await generateFlashcards(profile, difficulty, cardCount);
       setCards(aiCards);
       setCurrentIndex(0);
       setIsFlipped(false);
@@ -172,6 +174,25 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
                   }`}
                 >
                   {level}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest ml-1">Batch Size</label>
+            <div className="grid grid-cols-3 gap-2">
+              {([10, 25, 40] as CardCount[]).map((count) => (
+                <button
+                  key={count}
+                  onClick={() => setCardCount(count)}
+                  className={`py-3 rounded-lg border font-bold text-[10px] uppercase transition-all tracking-wider ${
+                    cardCount === count 
+                      ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20' 
+                      : 'bg-background border-border text-muted-foreground hover:border-primary/50'
+                  }`}
+                >
+                  {count} Cards
                 </button>
               ))}
             </div>

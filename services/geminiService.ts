@@ -16,7 +16,7 @@ const withRetry = async <T>(fn: () => Promise<T>, retries = 2, delay = 1000): Pr
     }
 };
 
-export const generateFlashcards = async (profile: UserProfile, difficulty: string = 'Medium'): Promise<Flashcard[]> => {
+export const generateFlashcards = async (profile: UserProfile, difficulty: string = 'Medium', count: number = 10): Promise<Flashcard[]> => {
   let mcLogic = "";
   if (difficulty === 'Easy') {
     mcLogic = "Every single flashcard MUST include 4 multiple-choice 'options' (one of which is the correct 'definition').";
@@ -26,7 +26,7 @@ export const generateFlashcards = async (profile: UserProfile, difficulty: strin
     mcLogic = "Only a few flashcards (about 2 or 3) should include multiple-choice 'options'. Most should rely on pure recall.";
   }
 
-  const prompt = `Generate a set of 15 high-quality educational flashcards for a student in ${profile.grade} studying ${profile.subject}. 
+  const prompt = `Generate a set of ${count} high-quality educational flashcards for a student in ${profile.grade} studying ${profile.subject}. 
   DIFFICULTY LEVEL: ${difficulty}. 
   ${mcLogic}
   The content should align with standard school curriculums. 
@@ -63,13 +63,13 @@ export const generateFlashcards = async (profile: UserProfile, difficulty: strin
   return JSON.parse(response.text.trim());
 };
 
-export const generateQuizQuestions = async (profile: UserProfile, weakTopics: string[] = [], focusTopics: string[] = []): Promise<QuizQuestion[]> => {
+export const generateQuizQuestions = async (profile: UserProfile, weakTopics: string[] = [], focusTopics: string[] = [], count: number = 10): Promise<QuizQuestion[]> => {
   const focusContext = focusTopics.length > 0 
     ? `USER SPECIFIC FOCUS: Heavily prioritize these specific topics: ${focusTopics.join(', ')}.` 
     : `ADAPTIVE LEARNING: Focus 60-70% of questions on these weak areas if provided: ${weakTopics.join(', ') || 'None'}.`;
 
   const prompt = `
-    Generate a 10-question multiple-choice quiz for a ${profile.grade} student studying ${profile.subject}.
+    Generate a ${count}-question multiple-choice quiz for a ${profile.grade} student studying ${profile.subject}.
     Include varied difficulty levels.
     ${focusContext}
     Each question must have 4 options and 1 correct answer.
