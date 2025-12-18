@@ -44,7 +44,6 @@ const App: React.FC = () => {
     setCurrentUser(updatedUser);
     localStorage.setItem('currentUser', JSON.stringify(updatedUser));
     
-    // Update users "database"
     const users = JSON.parse(localStorage.getItem('users') || '[]');
     const index = users.findIndex((u: User) => u.id === updatedUser.id);
     if (index !== -1) {
@@ -96,27 +95,73 @@ const App: React.FC = () => {
       case AppView.HOME:
       default:
         return (
-          <div className="text-center animate-in fade-in zoom-in duration-300">
-            <h1 className="text-4xl md:text-5xl font-bold text-cyan-400 mb-2 drop-shadow-lg">Master Your Studies</h1>
-            <p className="text-xl text-slate-400 mb-8 uppercase tracking-widest font-light">
-              {currentUser.profile?.grade} • {currentUser.profile?.subject}
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mb-12">
-              <Button onClick={() => setCurrentView(AppView.FLASHCARDS)} size="lg" className="w-full sm:w-64 py-5 shadow-2xl">
-                AI Flashcards
-              </Button>
-              <Button onClick={() => setCurrentView(AppView.QUIZ)} variant="secondary" size="lg" className="w-full sm:w-64 py-5 shadow-2xl">
-                Adaptive Quiz
-              </Button>
+          <div className="w-full max-w-4xl mx-auto space-y-12 animate-in fade-in zoom-in duration-500">
+            <div className="text-center relative">
+              <h1 className="text-4xl md:text-6xl font-black text-foreground mb-4 tracking-tighter">
+                MASTER YOUR <span className="text-primary">STUDIES</span>
+              </h1>
+              <div className="flex justify-center items-center gap-3">
+                <span className="px-3 py-1 bg-secondary border border-border rounded-md text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                  {currentUser.profile?.grade}
+                </span>
+                <span className="px-3 py-1 bg-primary/10 border border-primary/20 rounded-md text-xs font-bold text-primary uppercase tracking-widest">
+                  {currentUser.profile?.subject}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <button 
+                onClick={() => setCurrentView(AppView.FLASHCARDS)}
+                className="group relative p-8 bg-card border border-border rounded-lg shadow-2xl overflow-hidden hover:border-primary/50 transition-all text-left"
+              >
+                <div className="absolute top-0 right-0 p-4 text-primary/20 group-hover:text-primary/40 transition-colors">
+                  <span className="material-icons-round text-6xl">style</span>
+                </div>
+                <h3 className="text-2xl font-bold mb-2 group-hover:text-primary transition-colors">AI Flashcards</h3>
+                <p className="text-sm text-muted-foreground">Dynamic revision decks powered by Gemini AI.</p>
+                <div className="mt-6 flex items-center text-primary font-bold text-xs uppercase tracking-widest">
+                  Launch Module <span className="material-icons-round ml-2 text-sm">arrow_forward</span>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => setCurrentView(AppView.QUIZ)}
+                className="group relative p-8 bg-card border border-border rounded-lg shadow-2xl overflow-hidden hover:border-primary/50 transition-all text-left"
+              >
+                <div className="absolute top-0 right-0 p-4 text-primary/20 group-hover:text-primary/40 transition-colors">
+                  <span className="material-icons-round text-6xl">quiz</span>
+                </div>
+                <h3 className="text-2xl font-bold mb-2 group-hover:text-primary transition-colors">Adaptive Quiz</h3>
+                <p className="text-sm text-muted-foreground">Real-time assessment that learns from your mistakes.</p>
+                <div className="mt-6 flex items-center text-primary font-bold text-xs uppercase tracking-widest">
+                  Begin Test <span className="material-icons-round ml-2 text-sm">arrow_forward</span>
+                </div>
+              </button>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-               <ProgressGraph scores={subjectScores.slice(-10)} />
-               <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex flex-col justify-center items-center space-y-4 shadow-xl">
-                  <h3 className="text-xl font-bold text-slate-200">Session Controls</h3>
-                  <Button onClick={() => setCurrentView(AppView.PROFILE)} variant="primary" className="w-full">Dashboard & Analytics</Button>
-                  <Button onClick={() => setCurrentView(AppView.SETUP)} variant="ghost" className="w-full">Change Subject</Button>
-               </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                 <ProgressGraph scores={subjectScores.slice(-8)} />
+              </div>
+              <div className="bg-card border border-border p-8 rounded-lg shadow-2xl flex flex-col justify-center space-y-4">
+                <h3 className="text-lg font-bold text-foreground">Scholar Hub</h3>
+                <Button onClick={() => setCurrentView(AppView.PROFILE)} variant="secondary" className="w-full justify-start gap-3">
+                  <span className="material-icons-round text-sm">analytics</span>
+                  Analytics Dashboard
+                </Button>
+                <Button onClick={() => setCurrentView(AppView.SETUP)} variant="ghost" className="w-full justify-start gap-3">
+                  <span className="material-icons-round text-sm">settings</span>
+                  Update Target
+                </Button>
+                <div className="pt-4 border-t border-border mt-4">
+                  <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">System Status</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    <span className="text-xs text-foreground font-medium">AI Engine Online</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         );
@@ -124,7 +169,11 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white font-sans flex flex-col p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen flex flex-col relative overflow-hidden bg-background">
+      {/* Decorative Blobs */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] -z-10 opacity-40 pointer-events-none"></div>
+      <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px] -z-10 pointer-events-none"></div>
+
       <Header 
         profile={currentUser?.profile} 
         onLogout={handleLogout} 
@@ -132,11 +181,16 @@ const App: React.FC = () => {
         onHome={() => setCurrentView(AppView.HOME)}
         showNav={currentView !== AppView.AUTH}
       />
-      <main className="flex-grow flex items-center justify-center">
-        <div className="w-full max-w-5xl mx-auto py-8">
+      
+      <main className="flex-grow flex flex-col px-4 py-12 relative z-0">
+        <div className="w-full max-w-6xl mx-auto flex-grow flex items-center justify-center">
           {renderContent()}
         </div>
       </main>
+
+      <footer className="w-full py-6 text-center z-10 opacity-30">
+        <p className="text-[10px] text-muted-foreground font-bold tracking-[0.2em] uppercase">© 2024 STUDYBUDDY AI • NEURAL ASSESSMENT ENGINE</p>
+      </footer>
     </div>
   );
 };

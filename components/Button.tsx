@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -8,18 +7,18 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const Button: React.FC<ButtonProps> = ({ children, variant = 'primary', size = 'md', className = '', ...props }) => {
-  const baseClasses = "font-bold py-2 px-4 rounded-lg transition-transform transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900";
+  const baseClasses = "inline-flex items-center justify-center font-bold rounded-lg transition-all active:scale-[0.98] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2";
 
   const variantClasses = {
-    primary: 'bg-cyan-500 hover:bg-cyan-600 text-white focus:ring-cyan-400',
-    secondary: 'bg-indigo-500 hover:bg-indigo-600 text-white focus:ring-indigo-400',
-    ghost: 'bg-transparent hover:bg-slate-700 text-slate-300 border border-slate-600 focus:ring-slate-500',
+    primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+    secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border',
+    ghost: 'bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary border border-border',
   };
 
   const sizeClasses = {
-    sm: 'text-sm py-1 px-3',
-    md: 'text-base py-2 px-5',
-    lg: 'text-lg py-3 px-8',
+    sm: 'text-xs py-2 px-4',
+    md: 'text-sm py-3 px-6',
+    lg: 'text-base py-4 px-8',
   };
 
   return (

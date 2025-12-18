@@ -11,46 +11,42 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ profile, onLogout, onProfile, onHome, showNav }) => {
   return (
-    <header className="w-full flex justify-between items-center mb-8 md:mb-12 bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-md sticky top-4 z-50">
+    <header className="w-full px-6 py-6 flex items-center justify-between z-10 relative">
       <div className="flex items-center gap-3 cursor-pointer group" onClick={onHome}>
-        <div className="bg-cyan-500 p-2 rounded-lg group-hover:rotate-12 transition-transform">
-          <svg className="w-6 h-6 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
+        <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20 ring-1 ring-border group-hover:scale-105 transition-transform">
+          <span className="material-icons-round text-2xl">menu_book</span>
         </div>
-        <div>
-          <h1 className="text-xl font-black tracking-tight text-white uppercase italic">
-            Study<span className="text-cyan-400">Buddy</span>
+        <div className="flex flex-col">
+          <h1 className="text-xl font-bold tracking-tight text-foreground leading-none">
+            STUDY<span className="text-primary">BUDDY</span>
           </h1>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Adaptive AI</p>
+          <span className="text-[0.65rem] font-bold tracking-[0.2em] text-muted-foreground uppercase mt-1">Adaptive AI</span>
         </div>
       </div>
       
       {showNav && (
-        <div className="flex items-center gap-2 sm:gap-6">
-          <div className="hidden sm:flex flex-col text-right mr-2">
-            <p className="text-xs font-bold text-slate-400 uppercase">{profile?.grade || 'Welcome'}</p>
-            <p className="text-sm font-black text-cyan-400 truncate max-w-[120px]">{profile?.subject || 'Scholar'}</p>
+        <div className="flex items-center gap-4">
+          <div className="hidden md:flex flex-col text-right">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{profile?.grade || 'Scholar'}</span>
+            <span className="text-xs font-bold text-primary truncate max-w-[150px]">{profile?.subject || 'Assessment Mode'}</span>
           </div>
           
-          <nav className="flex items-center gap-1 sm:gap-2">
+          <div className="h-8 w-px bg-border mx-2 hidden md:block"></div>
+
+          <nav className="flex items-center gap-1">
             <button 
               onClick={onProfile}
-              className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-slate-400 hover:text-white"
-              title="View Profile"
+              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-primary"
+              title="Dashboard"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+              <span className="material-icons-round text-xl">account_circle</span>
             </button>
             <button 
               onClick={onLogout}
-              className="p-2 hover:bg-red-900/20 rounded-lg transition-colors text-slate-400 hover:text-red-400"
+              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
               title="Logout"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              <span className="material-icons-round text-xl">logout</span>
             </button>
           </nav>
         </div>
