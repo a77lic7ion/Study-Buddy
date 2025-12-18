@@ -24,15 +24,16 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
   const [hasSavedSession, setHasSavedSession] = useState(false);
   const [weakTopics, setWeakTopics] = useState<string[]>([]);
 
+  // Keys are fully partitioned by Subject to prevent data erasure/overwriting across modules
   const sessionKey = `quiz_session_${userId}_${profile.grade}_${profile.subject}`;
   const weakKey = `weakTopics_${userId}_${profile.grade}_${profile.subject}`;
 
   useEffect(() => {
-    // Check for saved quiz sessions
+    // Check for saved quiz sessions specific to THIS subject
     const saved = localStorage.getItem(sessionKey);
-    if (saved) setHasSavedSession(true);
+    setHasSavedSession(!!saved);
 
-    // Initialize/Load weak topics from localStorage on mount
+    // Initialize/Load weak topics specific to THIS subject
     const storedWeak = localStorage.getItem(weakKey);
     if (storedWeak) {
       try {
@@ -42,8 +43,6 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
         setWeakTopics([]);
       }
     } else {
-      // If no topics are found, initialize an empty array in storage
-      localStorage.setItem(weakKey, JSON.stringify([]));
       setWeakTopics([]);
     }
   }, [sessionKey, weakKey]);
@@ -54,10 +53,11 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
       currentIndex: updatedIndex,
       score: updatedScore,
       incorrect: updatedIncorrect,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      subject: profile.subject // Tagging metadata for safety
     };
     localStorage.setItem(sessionKey, JSON.stringify(sessionData));
-  }, [sessionKey]);
+  }, [sessionKey, profile.subject]);
 
   const resumeSession = () => {
     const saved = localStorage.getItem(sessionKey);
@@ -82,7 +82,6 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
     const topicsArray = focusTopics.split(',').map(t => t.trim()).filter(t => t.length > 0);
     
     try {
-      // Use the pre-loaded weakTopics from state for adaptive generation
       const qs = await generateQuizQuestions(profile, weakTopics, topicsArray);
       setQuestions(qs);
       setScore(0);
@@ -128,7 +127,7 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
       onTestComplete(finalScore);
       localStorage.removeItem(sessionKey);
 
-      // Persist newly identified weak topics
+      // Persist identified weak topics for THIS subject only
       const newlyWeak = incorrect.map(i => i.question.topic);
       const combined = Array.from(new Set([...weakTopics, ...newlyWeak])).slice(-20);
       setWeakTopics(combined);
@@ -150,7 +149,7 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
   if (status === 'loading') return (
     <div className="flex flex-col items-center">
       <LoadingSpinner />
-      <p className="mt-8 font-bold text-primary animate-pulse tracking-widest text-xs uppercase">Synthesizing Module...</p>
+      <p className="mt-8 font-bold text-primary animate-pulse tracking-widest text-[10px] uppercase">Synthesizing Learning Module...</p>
     </div>
   );
 
@@ -161,7 +160,7 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
           <span className="material-icons-round text-3xl">bolt</span>
         </div>
         <h2 className="text-2xl font-bold mb-2">Quiz Config</h2>
-        <p className="text-sm text-muted-foreground font-medium text-center italic">Calibrating neural assessment...</p>
+        <p className="text-xs text-muted-foreground font-medium text-center italic uppercase tracking-widest">Active Module: {profile.subject}</p>
       </div>
       
       <div className="space-y-6">
@@ -191,11 +190,11 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
         </div>
 
         <div className="flex flex-col gap-3 pt-4">
-          <Button onClick={start} size="lg" className="w-full uppercase tracking-widest">START TEST</Button>
+          <Button onClick={start} size="lg" className="w-full text-xs tracking-widest uppercase">START ASSESSMENT</Button>
           {hasSavedSession && (
-            <Button onClick={resumeSession} variant="secondary" className="w-full uppercase tracking-widest">RESUME LAST</Button>
+            <Button onClick={resumeSession} variant="secondary" className="w-full text-xs tracking-widest uppercase">RESUME PREVIOUS</Button>
           )}
-          <Button onClick={onBack} variant="ghost" className="w-full uppercase tracking-widest">BACK</Button>
+          <Button onClick={onBack} variant="ghost" className="w-full text-xs tracking-widest uppercase">BACK</Button>
         </div>
       </div>
     </div>
@@ -206,7 +205,7 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
       <div className="bg-card border border-border p-10 rounded-xl shadow-2xl relative overflow-hidden text-center">
         <div className="absolute top-0 left-0 w-full h-1 bg-primary"></div>
         <span className="text-5xl md:text-7xl font-black text-primary mb-2 drop-shadow-sm">{Math.round((score/questions.length)*100)}%</span>
-        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-[0.4em] mt-4">Mastery Score</p>
+        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-[0.4em] mt-4">Module Mastery Score</p>
       </div>
 
       <div className="space-y-4">
@@ -215,11 +214,11 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
             <h4 className="font-bold text-foreground mb-6 leading-tight">{r.question}</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                <div className="bg-destructive/10 p-4 rounded-lg border border-destructive/20">
-                 <span className="text-[9px] font-black uppercase text-destructive mb-2 block tracking-widest">Your Input</span>
+                 <span className="text-[9px] font-black uppercase text-destructive mb-2 block tracking-widest">Scholar Input</span>
                  <p className="text-sm font-bold">{r.userAnswer}</p>
                </div>
                <div className="bg-green-500/10 p-4 rounded-lg border border-green-500/20">
-                 <span className="text-[9px] font-black uppercase text-green-500 mb-2 block tracking-widest">Correct Path</span>
+                 <span className="text-[9px] font-black uppercase text-green-500 mb-2 block tracking-widest">Correct Response</span>
                  <p className="text-sm font-bold">{r.correctAnswer}</p>
                </div>
             </div>
@@ -230,7 +229,7 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
           </div>
         ))}
       </div>
-      <Button onClick={onBack} size="lg" className="w-full uppercase tracking-widest">Finalize Module</Button>
+      <Button onClick={onBack} size="lg" className="w-full text-xs tracking-widest uppercase">CLOSE ASSESSMENT</Button>
     </div>
   );
 
@@ -239,7 +238,7 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
     <div className="w-full max-w-2xl bg-card border border-border rounded-xl shadow-2xl p-8 relative overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
       <div className="flex items-center justify-between mb-10">
         <div className="flex flex-col">
-          <span className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-1">Assessment Engine</span>
+          <span className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-1">{profile.subject}</span>
           <span className="text-xl font-bold">{currentIndex+1} <span className="text-muted-foreground text-sm font-normal">/ {questions.length}</span></span>
         </div>
         <div className="flex-grow max-w-[200px] h-1.5 bg-secondary rounded-full mx-6 relative">
@@ -282,8 +281,8 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
 
       {selected && (
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <Button onClick={next} size="lg" className="w-full uppercase tracking-widest shadow-lg shadow-primary/20">
-            {currentIndex === questions.length - 1 ? 'End Simulation' : 'Next Step'}
+          <Button onClick={next} size="lg" className="w-full text-xs tracking-widest uppercase shadow-lg shadow-primary/20">
+            {currentIndex === questions.length - 1 ? 'End Simulation' : 'Next Question'}
           </Button>
         </div>
       )}
