@@ -51,5 +51,6 @@ export enum AppView {
   HOME,
   FLASHCARDS,
   QUIZ,
-  PROFILE
+  PROFILE,
+  REPORT_CARD
 }

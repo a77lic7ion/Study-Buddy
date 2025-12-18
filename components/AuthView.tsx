@@ -11,39 +11,61 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
     if (!email || !password) {
       setError('Required fields missing.');
+      setLoading(false);
       return;
     }
 
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
+    // Small delay to simulate processing and ensure state updates aren't racy
+    await new Promise(res => setTimeout(res, 300));
 
-    if (isLogin) {
-      const user = users.find((u: any) => u.email === email && u.password === password);
-      if (user) {
-        onAuthComplete(user);
-      } else {
-        setError('Authentication failed.');
+    try {
+      let users: User[] = [];
+      const storedUsers = localStorage.getItem('users');
+      if (storedUsers) {
+        try {
+          users = JSON.parse(storedUsers);
+        } catch (e) {
+          console.error("User database corrupted, initializing fresh list.");
+          users = [];
+        }
       }
-    } else {
-      const existing = users.find((u: any) => u.email === email);
-      if (existing) {
-        setError('Subject ID exists.');
+
+      if (isLogin) {
+        const user = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+        if (user) {
+          onAuthComplete(user);
+        } else {
+          setError('Authentication failed. Check credentials.');
+        }
       } else {
-        const newUser: User = {
-          id: Math.random().toString(36).substr(2, 9),
-          email,
-          password,
-        };
-        users.push(newUser);
-        localStorage.setItem('users', JSON.stringify(users));
-        onAuthComplete(newUser);
+        const existing = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+        if (existing) {
+          setError('Subject ID exists. Try logging in.');
+        } else {
+          const newUser: User = {
+            id: Math.random().toString(36).substring(2, 11),
+            email,
+            password,
+          };
+          users.push(newUser);
+          localStorage.setItem('users', JSON.stringify(users));
+          onAuthComplete(newUser);
+        }
       }
+    } catch (err) {
+      console.error("Auth system failure:", err);
+      setError('System storage error. Check browser permissions.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -51,7 +73,9 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
     <div className="w-full max-w-md bg-card border border-border rounded-lg shadow-2xl p-8 sm:p-10 relative z-0 animate-in fade-in zoom-in duration-500">
       <div className="flex flex-col items-center mb-10">
         <div className="w-16 h-16 bg-secondary rounded-lg flex items-center justify-center mb-6 text-primary ring-1 ring-border shadow-sm relative group overflow-hidden">
-          <span className="material-icons-round text-3xl relative z-10 text-primary">auto_stories</span>
+          <span className={`material-icons-round text-3xl relative z-10 text-primary ${loading ? 'animate-spin' : ''}`}>
+            {loading ? 'sync' : 'auto_stories'}
+          </span>
         </div>
         <h2 className="text-2xl font-bold text-foreground mb-2">{isLogin ? 'Welcome Back' : 'New Scholar'}</h2>
         <p className="text-sm text-muted-foreground font-medium text-center italic">{isLogin ? 'Resuming assessment session...' : 'Initiating learning journey...'}</p>
@@ -68,8 +92,9 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="block w-full pl-10 pr-3 py-3 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:border-ring transition-all outline-none text-sm" 
-              placeholder="smarty@example.com" 
+              disabled={loading}
+              className="block w-full pl-10 pr-3 py-3 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:border-ring transition-all outline-none text-sm disabled:opacity-50" 
+              placeholder="scholar@neuroforge.ai" 
               required
             />
           </div>
@@ -87,27 +112,35 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="block w-full pl-10 pr-3 py-3 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:border-ring transition-all outline-none text-sm" 
+              disabled={loading}
+              className="block w-full pl-10 pr-3 py-3 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:border-ring transition-all outline-none text-sm disabled:opacity-50" 
               placeholder="••••••••" 
               required
             />
           </div>
         </div>
 
-        {error && <p className="text-destructive text-[10px] font-bold text-center uppercase tracking-widest">{error}</p>}
+        {error && (
+          <div className="bg-destructive/10 border border-destructive/20 p-3 rounded-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+             <span className="material-icons-round text-destructive text-sm">error</span>
+             <p className="text-destructive text-[10px] font-bold uppercase tracking-widest leading-none">{error}</p>
+          </div>
+        )}
 
         <button 
           type="submit"
-          className="w-full flex justify-center py-4 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring focus:ring-offset-background transition-all active:scale-[0.98] mt-4 uppercase tracking-widest"
+          disabled={loading}
+          className="w-full flex justify-center py-4 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring focus:ring-offset-background transition-all active:scale-[0.98] mt-4 uppercase tracking-widest disabled:opacity-50"
         >
-          {isLogin ? 'Log In' : 'Sign Up'}
+          {loading ? 'Processing...' : (isLogin ? 'Log In' : 'Sign Up')}
         </button>
       </form>
 
       <div className="mt-10 pt-6 border-t border-border text-center">
         <button
-          onClick={() => setIsLogin(!isLogin)}
-          className="text-sm text-muted-foreground hover:text-primary transition-colors"
+          onClick={() => { setIsLogin(!isLogin); setError(''); }}
+          disabled={loading}
+          className="text-sm text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
         >
           {isLogin ? "Need a new account? " : "Already registered? "}
           <span className="font-bold text-primary">{isLogin ? 'Sign up' : 'Log in'}</span>

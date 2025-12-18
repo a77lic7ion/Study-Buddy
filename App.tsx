@@ -9,6 +9,7 @@ import SetupView from './components/SetupView';
 import AuthView from './components/AuthView';
 import ProfileView from './components/ProfileView';
 import IntroSequence from './components/IntroSequence';
+import ReportCardView from './components/ReportCardView';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -16,9 +17,19 @@ const App: React.FC = () => {
   const [testScores, setTestScores] = useState<TestResult[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(true);
 
+  // Safe localStorage getter
+  const getStoredItem = (key: string) => {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      console.warn(`LocalStorage access failed for key: ${key}`, e);
+      return null;
+    }
+  };
+
   useEffect(() => {
     // Initial theme setup
-    const storedTheme = localStorage.getItem('theme');
+    const storedTheme = getStoredItem('theme');
     const darkMode = storedTheme === null ? true : storedTheme === 'dark';
     setIsDarkMode(darkMode);
     if (darkMode) {
@@ -27,25 +38,39 @@ const App: React.FC = () => {
       document.documentElement.classList.remove('dark');
     }
 
-    const hasSeenIntro = localStorage.getItem('hasSeenIntro');
-    const storedUser = localStorage.getItem('currentUser');
+    const hasSeenIntro = getStoredItem('hasSeenIntro');
+    const storedUserRaw = getStoredItem('currentUser');
     
-    if (storedUser) {
-      const user = JSON.parse(storedUser);
-      setCurrentUser(user);
-      setCurrentView(user.profile ? AppView.HOME : AppView.SETUP);
+    if (storedUserRaw) {
+      try {
+        const user = JSON.parse(storedUserRaw);
+        setCurrentUser(user);
+        setCurrentView(user.profile ? AppView.HOME : AppView.SETUP);
+      } catch (e) {
+        console.error("Corrupted user data found, resetting...", e);
+        localStorage.removeItem('currentUser');
+        setCurrentView(AppView.AUTH);
+      }
     } else if (hasSeenIntro) {
       setCurrentView(AppView.AUTH);
     }
 
-    const storedScores = localStorage.getItem('testScores');
-    if (storedScores) setTestScores(JSON.parse(storedScores));
+    const storedScoresRaw = getStoredItem('testScores');
+    if (storedScoresRaw) {
+      try {
+        setTestScores(JSON.parse(storedScoresRaw));
+      } catch (e) {
+        console.error("Corrupted scores data found", e);
+      }
+    }
   }, []);
 
   const toggleTheme = () => {
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
-    localStorage.setItem('theme', newMode ? 'dark' : 'light');
+    try {
+      localStorage.setItem('theme', newMode ? 'dark' : 'light');
+    } catch (e) {}
     if (newMode) {
       document.documentElement.classList.add('dark');
     } else {
@@ -54,19 +79,27 @@ const App: React.FC = () => {
   };
 
   const handleIntroComplete = () => {
-    localStorage.setItem('hasSeenIntro', 'true');
+    try {
+      localStorage.setItem('hasSeenIntro', 'true');
+    } catch (e) {}
     setCurrentView(AppView.AUTH);
   };
 
   const handleAuthComplete = (user: User) => {
     setCurrentUser(user);
-    localStorage.setItem('currentUser', JSON.stringify(user));
+    try {
+      localStorage.setItem('currentUser', JSON.stringify(user));
+    } catch (e) {
+      console.error("Failed to persist session", e);
+    }
     setCurrentView(user.profile ? AppView.HOME : AppView.SETUP);
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('currentUser');
+    try {
+      localStorage.removeItem('currentUser');
+    } catch (e) {}
     setCurrentView(AppView.AUTH);
   };
 
@@ -74,13 +107,18 @@ const App: React.FC = () => {
     if (!currentUser) return;
     const updatedUser = { ...currentUser, profile };
     setCurrentUser(updatedUser);
-    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
     
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const index = users.findIndex((u: User) => u.id === updatedUser.id);
-    if (index !== -1) {
-      users[index] = updatedUser;
-      localStorage.setItem('users', JSON.stringify(users));
+    try {
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      const usersRaw = getStoredItem('users');
+      const users = usersRaw ? JSON.parse(usersRaw) : [];
+      const index = users.findIndex((u: User) => u.id === updatedUser.id);
+      if (index !== -1) {
+        users[index] = updatedUser;
+        localStorage.setItem('users', JSON.stringify(users));
+      }
+    } catch (e) {
+      console.error("Setup persistence failed", e);
     }
 
     setCurrentView(AppView.HOME);
@@ -88,14 +126,16 @@ const App: React.FC = () => {
 
   const handleUserUpdate = (updatedUser: User) => {
     setCurrentUser(updatedUser);
-    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-    
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const index = users.findIndex((u: User) => u.id === updatedUser.id);
-    if (index !== -1) {
-      users[index] = updatedUser;
-      localStorage.setItem('users', JSON.stringify(users));
-    }
+    try {
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      const usersRaw = getStoredItem('users');
+      const users = usersRaw ? JSON.parse(usersRaw) : [];
+      const index = users.findIndex((u: User) => u.id === updatedUser.id);
+      if (index !== -1) {
+        users[index] = updatedUser;
+        localStorage.setItem('users', JSON.stringify(users));
+      }
+    } catch (e) {}
   };
 
   const handleTestComplete = useCallback((score: number, type: 'quiz' | 'flashcard') => {
@@ -112,7 +152,9 @@ const App: React.FC = () => {
 
     setTestScores(prev => {
       const updated = [...prev, newScore];
-      localStorage.setItem('testScores', JSON.stringify(updated));
+      try {
+        localStorage.setItem('testScores', JSON.stringify(updated));
+      } catch (e) {}
       return updated;
     });
   }, [currentUser]);
@@ -139,7 +181,9 @@ const App: React.FC = () => {
       case AppView.QUIZ:
         return <Quiz profile={currentUser.profile!} userId={currentUser.id} onBack={() => setCurrentView(AppView.HOME)} onTestComplete={(s) => handleTestComplete(s, 'quiz')} />;
       case AppView.PROFILE:
-        return <ProfileView user={currentUser} scores={userScores} onBack={() => setCurrentView(AppView.HOME)} onUpdateUser={handleUserUpdate} />;
+        return <ProfileView user={currentUser} scores={userScores} onBack={() => setCurrentView(AppView.HOME)} onUpdateUser={handleUserUpdate} onOpenReportCard={() => setCurrentView(AppView.REPORT_CARD)} />;
+      case AppView.REPORT_CARD:
+        return <ReportCardView user={currentUser} scores={userScores} onBack={() => setCurrentView(AppView.PROFILE)} />;
       case AppView.HOME:
       default:
         return (

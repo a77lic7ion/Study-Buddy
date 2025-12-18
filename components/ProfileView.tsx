@@ -8,9 +8,10 @@ interface ProfileViewProps {
   scores: TestResult[];
   onBack: () => void;
   onUpdateUser: (updatedUser: User) => void;
+  onOpenReportCard: () => void;
 }
 
-const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdateUser }) => {
+const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdateUser, onOpenReportCard }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Logic to calculate strengths and weaknesses
@@ -100,7 +101,11 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdat
             </div>
           </div>
           
-          <div className="flex gap-2 no-print">
+          <div className="flex gap-2 no-print flex-wrap justify-end">
+            <Button onClick={onOpenReportCard} variant="primary" size="sm" className="flex items-center gap-2">
+              <span className="material-icons-round text-sm">history_edu</span>
+              View Report Card
+            </Button>
             <Button onClick={handlePrint} variant="ghost" size="sm" className="flex items-center gap-2">
               <span className="material-icons-round text-sm">picture_as_pdf</span>
               Export PDF
