@@ -49,6 +49,7 @@ const App: React.FC = () => {
   const [testScores, setTestScores] = useState<TestResult[]>([]);
   const [apiSettings, setApiSettings] = useState<ApiSettings>(DEFAULT_API_SETTINGS);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [remediationMode, setRemediationMode] = useState(false);
 
   const getStoredItem = (key: string) => {
     try {
@@ -145,11 +146,17 @@ const App: React.FC = () => {
       localStorage.setItem('testScores', JSON.stringify(updated));
       return updated;
     });
+    setRemediationMode(false);
   }, [currentUser, currentView]);
 
   const handleSaveSettings = (newSettings: ApiSettings) => {
     setApiSettings(newSettings);
     localStorage.setItem('apiSettings', JSON.stringify(newSettings));
+  };
+
+  const handleStartRemediation = (type: 'quiz' | 'flashcards') => {
+    setRemediationMode(true);
+    setCurrentView(type === 'quiz' ? AppView.QUIZ : AppView.FLASHCARDS);
   };
 
   const userScores = testScores.filter(s => s.userId === currentUser?.id);
@@ -174,11 +181,11 @@ const App: React.FC = () => {
       case AppView.SETUP:
         return <SetupView onComplete={handleSetupComplete} initialProfile={currentUser.profile} />;
       case AppView.FLASHCARDS:
-        return <FlashcardViewer userId={currentUser.id} profile={currentUser.profile!} onBack={() => setCurrentView(AppView.HOME)} onTestComplete={handleTestComplete} />;
+        return <FlashcardViewer userId={currentUser.id} profile={currentUser.profile!} onBack={() => {setCurrentView(AppView.HOME); setRemediationMode(false);}} onTestComplete={handleTestComplete} isRemediation={remediationMode} />;
       case AppView.QUIZ:
-        return <Quiz profile={currentUser.profile!} userId={currentUser.id} onBack={() => setCurrentView(AppView.HOME)} onTestComplete={handleTestComplete} />;
+        return <Quiz profile={currentUser.profile!} userId={currentUser.id} onBack={() => {setCurrentView(AppView.HOME); setRemediationMode(false);}} onTestComplete={handleTestComplete} isRemediation={remediationMode} />;
       case AppView.PROFILE:
-        return <ProfileView user={currentUser} scores={userScores} onBack={() => setCurrentView(AppView.HOME)} onUpdateUser={(u) => {setCurrentUser(u); localStorage.setItem('currentUser', JSON.stringify(u));}} onOpenReportCard={() => setCurrentView(AppView.REPORT_CARD)} />;
+        return <ProfileView user={currentUser} scores={userScores} onBack={() => setCurrentView(AppView.HOME)} onUpdateUser={(u) => {setCurrentUser(u); localStorage.setItem('currentUser', JSON.stringify(u));}} onOpenReportCard={() => setCurrentView(AppView.REPORT_CARD)} onStartRemediation={handleStartRemediation} />;
       case AppView.REPORT_CARD:
         return <ReportCardView user={currentUser} scores={userScores} onBack={() => setCurrentView(AppView.PROFILE)} />;
       case AppView.HOME:

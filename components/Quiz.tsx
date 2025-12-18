@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { QuizQuestion, IncorrectAnswer, QuestionReview, UserProfile } from '../types';
 import { generateQuizQuestions, generateReview } from '../services/geminiService';
@@ -10,12 +11,13 @@ interface QuizProps {
   userId: string;
   onBack: () => void;
   onTestComplete: (score: number) => void;
+  isRemediation?: boolean;
 }
 
 type QuestionCount = 10 | 25 | 30;
 
-const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) => {
-  const [status, setStatus] = useState<'loading' | 'active' | 'review' | 'intro'>('intro');
+const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete, isRemediation = false }) => {
+  const [status, setStatus] = useState<'loading' | 'active' | 'review' | 'intro'>(isRemediation ? 'loading' : 'intro');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [questionCount, setQuestionCount] = useState<QuestionCount>(10);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -30,18 +32,29 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
   const weakKey = `weakTopics_${userId}_${profile.grade}_${profile.subject}`;
 
   useEffect(() => {
-    const saved = localStorage.getItem(sessionKey);
     const storedWeak = localStorage.getItem(weakKey);
     if (storedWeak) {
       try {
-        setWeakTopics(JSON.parse(storedWeak));
+        const parsed = JSON.parse(storedWeak);
+        setWeakTopics(parsed);
+        if (isRemediation) {
+           start(parsed);
+        }
       } catch (e) {
         setWeakTopics([]);
       }
+    } else if (isRemediation) {
+        onBack(); // Nothing to remediate
     }
-  }, [sessionKey, weakKey]);
+
+    if (!isRemediation) {
+        const saved = localStorage.getItem(sessionKey);
+        if (saved) { /* Optional: Restore previous session logic */ }
+    }
+  }, [sessionKey, weakKey, isRemediation]);
 
   const saveProgress = useCallback((updatedIndex: number, updatedScore: number, updatedIncorrect: IncorrectAnswer[], currentQuestions: QuizQuestion[]) => {
+    if (isRemediation) return;
     const sessionData = {
       questions: currentQuestions,
       currentIndex: updatedIndex,
@@ -51,13 +64,14 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
       subject: profile.subject
     };
     localStorage.setItem(sessionKey, JSON.stringify(sessionData));
-  }, [sessionKey, profile.subject]);
+  }, [sessionKey, profile.subject, isRemediation]);
 
-  const start = async () => {
+  const start = async (providedWeak?: string[]) => {
     setStatus('loading');
+    const activeWeak = providedWeak || weakTopics;
     const topicsArray = focusTopics.split(',').map(t => t.trim()).filter(t => t.length > 0);
     try {
-      const qs = await generateQuizQuestions(profile, weakTopics, topicsArray, questionCount);
+      const qs = await generateQuizQuestions(profile, activeWeak, topicsArray, questionCount, isRemediation);
       setQuestions(qs);
       setScore(0);
       setCurrentIndex(0);
@@ -66,7 +80,8 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
       saveProgress(0, 0, [], qs);
       setStatus('active');
     } catch (e) {
-      setStatus('intro');
+      if (isRemediation) onBack();
+      else setStatus('intro');
     }
   };
 
@@ -105,9 +120,7 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
       onBack();
       return;
     }
-    const finalScore = Math.round((score / totalAnswered) * 100);
     
-    // Save metadata
     const newlyWeak = incorrect.map(i => i.question.topic);
     const combined = Array.from(new Set([...weakTopics, ...newlyWeak])).slice(-20);
     localStorage.setItem(weakKey, JSON.stringify(combined));
@@ -127,7 +140,6 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
   const commitData = () => {
     const totalAnswered = currentIndex + (selected ? 1 : 0);
     const finalScore = Math.round((score / totalAnswered) * 100);
-    // Fixed: Removed the second argument 'quiz' as the interface only expects 'score: number'
     onTestComplete(finalScore);
     localStorage.removeItem(sessionKey);
     onBack();
@@ -136,7 +148,9 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
   if (status === 'loading') return (
     <div className="flex flex-col items-center">
       <LoadingSpinner />
-      <p className="mt-8 font-black text-primary animate-pulse tracking-widest text-[10px] uppercase">Processing Session Artifacts...</p>
+      <p className="mt-8 font-black text-primary animate-pulse tracking-widest text-[10px] uppercase">
+        {isRemediation ? 'SYNTHESIZING REMEDIATION SCENARIOS...' : 'Processing Session Artifacts...'}
+      </p>
     </div>
   );
 
@@ -168,7 +182,7 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
         </div>
 
         <div className="flex flex-col gap-3 pt-4">
-          <Button onClick={start} size="lg" className="w-full text-[10px] uppercase tracking-widest">INITIALIZE SIMULATION</Button>
+          <Button onClick={() => start()} size="lg" className="w-full text-[10px] uppercase tracking-widest">INITIALIZE SIMULATION</Button>
           <Button onClick={onBack} variant="ghost" className="w-full text-[10px] uppercase tracking-widest">ABORT</Button>
         </div>
       </div>
@@ -179,7 +193,9 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
     <div className="w-full max-w-2xl space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="bg-card border border-border p-12 rounded-2xl shadow-2xl relative overflow-hidden text-center">
         <div className="absolute top-0 left-0 w-full h-1.5 bg-primary"></div>
-        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] mb-4 block">Simulation Complete</span>
+        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] mb-4 block">
+            {isRemediation ? 'Remediation Session Finished' : 'Simulation Complete'}
+        </span>
         <span className="text-6xl md:text-8xl font-black text-primary drop-shadow-sm">{Math.round((score/questions.length)*100)}%</span>
         <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mt-6 italic">Mastery achieved across {questions.length} cycles</p>
       </div>
@@ -215,15 +231,14 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
 
   return (
     <div className="w-full flex flex-col items-center">
-      {/* Persistent Progress Bar at top of screen */}
       <div className="fixed top-0 left-0 w-full h-1.5 bg-secondary z-[60]">
         <div 
-          className="h-full bg-primary shadow-[0_0_15px_rgba(79,70,229,0.8)] transition-all duration-500 ease-out"
+          className={`h-full ${isRemediation ? 'bg-destructive' : 'bg-primary'} shadow-[0_0_15px_rgba(79,70,229,0.8)] transition-all duration-500 ease-out`}
           style={{ width: `${progress}%` }}
         ></div>
         <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-card border border-border px-4 py-1.5 rounded-full shadow-lg">
            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-foreground">
-             Question {currentIndex + 1} <span className="text-muted-foreground">/ {questions.length}</span>
+             {isRemediation ? 'REMEDIATION' : 'Question'} {currentIndex + 1} <span className="text-muted-foreground">/ {questions.length}</span>
            </span>
         </div>
       </div>
@@ -231,15 +246,18 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
       <div className="w-full max-w-2xl bg-card border border-border rounded-2xl shadow-2xl p-8 mt-16 relative overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center justify-between mb-10">
           <div className="flex flex-col">
-            <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-1">{profile.subject}</span>
-            <span className="text-xl font-black">Active Phase</span>
+            <span className={`text-[10px] font-black ${isRemediation ? 'text-destructive' : 'text-primary'} uppercase tracking-[0.3em] mb-1`}>{profile.subject}</span>
+            <span className="text-xl font-black">{isRemediation ? 'Restoration Phase' : 'Active Phase'}</span>
           </div>
           <button onClick={finalizeQuiz} className="text-[9px] font-black uppercase tracking-widest text-destructive hover:opacity-70 transition-opacity flex items-center gap-2">
             <span className="material-icons-round text-sm">cancel</span>
-            Terminate & Score
+            Abort
           </button>
         </div>
-        <div className="mb-6 flex items-center gap-2"><span className="material-icons-round text-primary text-xs">label</span><span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">{q.topic}</span></div>
+        <div className="mb-6 flex items-center gap-2">
+            <span className={`material-icons-round ${isRemediation ? 'text-destructive' : 'text-primary'} text-xs`}>label</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">{q.topic}</span>
+        </div>
         <h3 className="text-xl md:text-2xl font-black mb-10 leading-tight italic">{q.question}</h3>
         <div className="grid grid-cols-1 gap-3 mb-10">
           {q.options.map(opt => {
@@ -263,7 +281,7 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
         {selected && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
             <Button onClick={next} size="lg" className="w-full text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20">
-              {currentIndex === questions.length - 1 ? 'End Simulation' : 'Next Transmission'}
+              {currentIndex === questions.length - 1 ? 'Finalize Protocol' : 'Next Cycle'}
             </Button>
           </div>
         )}

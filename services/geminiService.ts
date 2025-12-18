@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { QuizQuestion, IncorrectAnswer, QuestionReview, Flashcard, UserProfile, ApiSettings } from '../types';
 
@@ -29,11 +30,6 @@ const withRetry = async <T>(fn: () => Promise<T>, retries = 2, delay = 1000): Pr
   }
 };
 
-/**
- * Orchestrates AI requests across different providers.
- * If Gemini is selected, it uses the official SDK with structured output.
- * For others, it uses fetch to communicate with OpenAI-compatible or Ollama endpoints.
- */
 const requestAI = async (prompt: string, schema: any): Promise<any> => {
   const settings = getStoredSettings();
   const activeProvider = settings?.activeProvider || 'gemini';
@@ -54,7 +50,6 @@ const requestAI = async (prompt: string, schema: any): Promise<any> => {
 
     return JSON.parse(response.text.trim());
   } else {
-    // Non-Gemini providers (Ollama, OpenAI, Mistral)
     if (!config || !config.baseUrl) {
       throw new Error(`Configuration missing for provider: ${activeProvider}`);
     }
@@ -71,7 +66,6 @@ const requestAI = async (prompt: string, schema: any): Promise<any> => {
       headers['Authorization'] = `Bearer ${config.apiKey}`;
     }
 
-    // Enhance prompt to enforce JSON structure for providers without native schema support
     const enhancedPrompt = `${prompt}\n\nIMPORTANT: You MUST respond strictly with valid JSON that matches this schema: ${JSON.stringify(schema)}. Do not include any markdown formatting or extra text.`;
 
     const body: any = isOllama ? {
@@ -98,7 +92,6 @@ const requestAI = async (prompt: string, schema: any): Promise<any> => {
 
     const data = await response.json();
     
-    // Parse result based on common API response structures
     let resultString = "";
     if (isOllama) {
       resultString = data.response;
@@ -110,7 +103,7 @@ const requestAI = async (prompt: string, schema: any): Promise<any> => {
   }
 };
 
-export const generateFlashcards = async (profile: UserProfile, difficulty: string = 'Medium', count: number = 10): Promise<Flashcard[]> => {
+export const generateFlashcards = async (profile: UserProfile, difficulty: string = 'Medium', count: number = 10, isRemediation: boolean = false, weakTopics: string[] = []): Promise<Flashcard[]> => {
   let mcLogic = "";
   if (difficulty === 'Easy') {
     mcLogic = "Every single flashcard MUST include 4 multiple-choice 'options' (one of which is the correct 'definition').";
@@ -120,14 +113,18 @@ export const generateFlashcards = async (profile: UserProfile, difficulty: strin
     mcLogic = "Only a few flashcards (about 2 or 3) should include multiple-choice 'options'. Most should rely on pure recall.";
   }
 
-  const prompt = `Generate a set of ${count} high-quality educational flashcards for a student in ${profile.grade} studying ${profile.subject}. 
-  DIFFICULTY LEVEL: ${difficulty}. 
+  const basePrompt = isRemediation 
+    ? `NEURAL RESTORATION PROTOCOL: Create ${count} remediation flashcards for ${profile.grade} ${profile.subject}. 
+       FOCUS TOPICS (Failed Concepts): ${weakTopics.join(', ')}.
+       CRITICAL INSTRUCTION: Reword these concepts into entirely new scenarios, contexts, and wordings. 
+       The student has failed these concepts before; do NOT use standard textbook phrasing. 
+       Use real-world applications or unusual examples to ensure they understand the deep principle, not just the words.`
+    : `Generate a set of ${count} high-quality educational flashcards for a student in ${profile.grade} studying ${profile.subject}. DIFFICULTY LEVEL: ${difficulty}.`;
+
+  const prompt = `${basePrompt} 
   ${mcLogic}
-  The content should align with standard school curriculums. 
   IMPORTANT: The "term" property should be a full, descriptive question.
-  For cards with "options", ensure the "definition" matches exactly one of the options.
-  Include an "explanation" field for every card that provides a concise, insightful breakdown of the concept (2-3 sentences).
-  Focus on key terms, definitions, and core concepts appropriate for the ${difficulty} level.`;
+  Include an "explanation" field for every card that provides a concise, insightful breakdown of the concept (2-3 sentences).`;
 
   const schema = {
     type: Type.ARRAY,
@@ -149,15 +146,16 @@ export const generateFlashcards = async (profile: UserProfile, difficulty: strin
   return requestAI(prompt, schema);
 };
 
-export const generateQuizQuestions = async (profile: UserProfile, weakTopics: string[] = [], focusTopics: string[] = [], count: number = 10): Promise<QuizQuestion[]> => {
-  const focusContext = focusTopics.length > 0 
-    ? `USER SPECIFIC FOCUS: Heavily prioritize these specific topics: ${focusTopics.join(', ')}.` 
-    : `ADAPTIVE LEARNING: Focus 60-70% of questions on these weak areas if provided: ${weakTopics.join(', ') || 'None'}.`;
+export const generateQuizQuestions = async (profile: UserProfile, weakTopics: string[] = [], focusTopics: string[] = [], count: number = 10, isRemediation: boolean = false): Promise<QuizQuestion[]> => {
+  const basePrompt = isRemediation
+    ? `REMEDIATION SIMULATION: Generate ${count} challenging multiple-choice questions for ${profile.grade} ${profile.subject}.
+       CORE WEAKNESSES: ${weakTopics.join(', ')}.
+       MANDATORY: Transform these concepts. If they previously failed a question on 'Gravity', ask about 'Orbital Mechanics' or 'Weight on different planets'. 
+       Reword and re-contextualize so they cannot answer based on visual memory of previous questions.`
+    : `Generate a ${count}-question multiple-choice quiz for a ${profile.grade} student studying ${profile.subject}.
+       ${focusTopics.length > 0 ? `USER SPECIFIC FOCUS: Heavily prioritize these specific topics: ${focusTopics.join(', ')}.` : `ADAPTIVE LEARNING: Focus on weak areas: ${weakTopics.join(', ') || 'None'}.`}`;
 
-  const prompt = `
-    Generate a ${count}-question multiple-choice quiz for a ${profile.grade} student studying ${profile.subject}.
-    Include varied difficulty levels.
-    ${focusContext}
+  const prompt = `${basePrompt}
     Each question must have 4 options and 1 correct answer.
     The "topic" field should be a concise category for the question.
   `;

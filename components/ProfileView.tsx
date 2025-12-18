@@ -1,3 +1,4 @@
+
 import React, { useRef, useMemo } from 'react';
 import { User, TestResult } from '../types';
 import Button from './Button';
@@ -9,9 +10,10 @@ interface ProfileViewProps {
   onBack: () => void;
   onUpdateUser: (updatedUser: User) => void;
   onOpenReportCard: () => void;
+  onStartRemediation: (type: 'quiz' | 'flashcards') => void;
 }
 
-const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdateUser, onOpenReportCard }) => {
+const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdateUser, onOpenReportCard, onStartRemediation }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const subjectStats = useMemo(() => scores.reduce((acc: any, curr) => {
@@ -24,7 +26,6 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdat
 
   const currentSubject = user.profile?.subject || 'None';
   
-  // Gaps analysis: Count frequency of weak topics
   const gapAnalysis = useMemo(() => {
     const weakKey = `weakTopics_${user.id}_${user.profile?.grade}_${currentSubject}`;
     const rawWeakTopics: string[] = JSON.parse(localStorage.getItem(weakKey) || '[]');
@@ -37,7 +38,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdat
     return Object.entries(counts)
       .map(([topic, count]) => ({ topic, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 5); // Show top 5 gaps
+      .slice(0, 5);
   }, [user.id, user.profile?.grade, currentSubject]);
 
   const avgScore = scores.length > 0 
@@ -152,6 +153,27 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdat
           </div>
         </div>
 
+        {/* Remediation Protocol Section */}
+        {gapAnalysis.length > 0 && (
+          <div className="bg-primary/5 border border-primary/20 p-8 rounded-[2rem] shadow-2xl flex flex-col md:flex-row items-center justify-between gap-8 no-print animate-in zoom-in duration-500">
+            <div className="flex items-center gap-6">
+               <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary border border-primary/20 shadow-lg">
+                 <span className="material-icons-round text-4xl animate-pulse">healing</span>
+               </div>
+               <div>
+                  <h3 className="text-xl font-black uppercase italic tracking-tighter">Remediation Protocol</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mt-1 max-w-sm">
+                    Initiate targeted neural restoration. AI will synthesize <span className="text-primary italic">entirely reworded</span> assessments to bypass rote memorization.
+                  </p>
+               </div>
+            </div>
+            <div className="flex gap-4">
+               <Button onClick={() => onStartRemediation('flashcards')} variant="primary" className="text-[9px] uppercase tracking-widest px-6 bg-primary/20 border-primary/30 text-primary hover:bg-primary/40">Restoration Deck</Button>
+               <Button onClick={() => onStartRemediation('quiz')} variant="primary" className="text-[9px] uppercase tracking-widest px-6 shadow-lg shadow-primary/20">Simulated Lab</Button>
+            </div>
+          </div>
+        )}
+
         {/* Mid Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-6">
@@ -226,74 +248,11 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdat
                    </div>
                  )}
                </div>
-
-               <div className="mt-10 p-5 bg-secondary/20 rounded-2xl border border-white/5">
-                 <p className="text-[9px] text-muted-foreground font-bold leading-relaxed uppercase tracking-wider opacity-60 italic">
-                   Gaps represent repetitive conceptual failures. High frequency items are automatically prioritized in the next Recall Cycle.
-                 </p>
-               </div>
             </div>
           </div>
 
           <div className="bg-card/30 backdrop-blur-xl p-10 rounded-[2rem] border border-white/5 shadow-2xl flex flex-col min-h-[600px]">
              <ProgressGraph scores={scores.slice(-10)} />
-          </div>
-        </div>
-
-        {/* Evaluation History Log */}
-        <div className="bg-card/30 backdrop-blur-xl p-12 rounded-[2rem] border border-white/5 shadow-2xl">
-          <h3 className="text-[11px] font-black uppercase mb-10 text-foreground tracking-[0.4em] flex items-center gap-3">
-            <span className="material-icons-round text-lg text-primary">data_usage</span>
-            Central Evaluation History
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.4em] border-b border-white/5">
-                  <th className="pb-8 px-6">Timestamp</th>
-                  <th className="pb-8 px-6">Module Type</th>
-                  <th className="pb-8 px-6">Format</th>
-                  <th className="pb-8 px-6 text-right">Recall Efficiency</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {scores.slice().reverse().map((s, i) => (
-                  <tr key={i} className={`group hover:bg-primary/10 transition-all ${s.subject === currentSubject ? 'bg-primary/5' : ''}`}>
-                    <td className="py-8 px-6">
-                      <span className="text-[11px] font-black text-muted-foreground font-mono opacity-80">
-                        {new Date(s.date).toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="py-8 px-6">
-                      <div className="flex flex-col">
-                        <span className="text-base font-black italic uppercase group-hover:text-primary transition-colors tracking-tight">{s.subject}</span>
-                        <span className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em] mt-1.5 opacity-40">{s.grade} SYNTHESIS</span>
-                      </div>
-                    </td>
-                    <td className="py-8 px-6">
-                      <span className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-[0.2em] border shadow-sm ${s.type === 'quiz' ? 'bg-primary/20 border-primary/30 text-primary' : 'bg-secondary/50 border-white/10 text-muted-foreground'}`}>
-                        {s.type}
-                      </span>
-                    </td>
-                    <td className="py-8 px-6 text-right">
-                      <span className={`text-3xl font-black italic ${s.score >= 80 ? 'text-green-500' : s.score >= 50 ? 'text-amber-500' : 'text-destructive'} drop-shadow-xl`}>
-                        {s.score}%
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {scores.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="py-24 text-center">
-                       <div className="flex flex-col items-center opacity-10">
-                         <span className="material-icons-round text-6xl mb-4">cloud_off</span>
-                         <p className="text-[12px] font-black uppercase tracking-[0.5em]">No neural records detected.</p>
-                       </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>

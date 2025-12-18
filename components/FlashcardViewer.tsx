@@ -11,20 +11,21 @@ interface FlashcardViewerProps {
   userId: string;
   onBack: () => void;
   onTestComplete: (score: number) => void;
+  isRemediation?: boolean;
 }
 
 type Difficulty = 'Easy' | 'Medium' | 'Hard';
 type CardCount = 10 | 25 | 40;
 
-const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBack, onTestComplete }) => {
+const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBack, onTestComplete, isRemediation = false }) => {
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<'setup' | 'active' | 'summary'>('setup');
+  const [status, setStatus] = useState<'setup' | 'active' | 'summary'>(isRemediation ? 'setup' : 'setup');
   const [difficulty, setDifficulty] = useState<Difficulty>('Medium');
   const [cardCount, setCardCount] = useState<CardCount>(10);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [isTestMode, setIsTestMode] = useState(false);
+  const [isTestMode, setIsTestMode] = useState(isRemediation);
   const [testScore, setTestScore] = useState(0);
   const [cardsEvaluated, setCardsEvaluated] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -33,8 +34,13 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
   const [showExplanation, setShowExplanation] = useState(false);
 
   const persistenceKey = `flashcard_session_${userId}_${profile.grade}_${profile.subject}`;
+  const weakKey = `weakTopics_${userId}_${profile.grade}_${profile.subject}`;
 
   useEffect(() => {
+    if (isRemediation) {
+        startSession();
+        return;
+    }
     const savedSession = localStorage.getItem(persistenceKey);
     if (savedSession) {
       try {
@@ -48,7 +54,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
         console.error("Failed to load saved session", e);
       }
     }
-  }, [persistenceKey]);
+  }, [persistenceKey, isRemediation]);
 
   useEffect(() => {
     if (status === 'active' && !loading && cards.length > 0) {
@@ -59,7 +65,8 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
   const startSession = async () => {
     setLoading(true);
     try {
-      const aiCards = await generateFlashcards(profile, difficulty, cardCount);
+      const weakTopics: string[] = JSON.parse(localStorage.getItem(weakKey) || '[]');
+      const aiCards = await generateFlashcards(profile, difficulty, cardCount, isRemediation, weakTopics);
       setCards(aiCards);
       setCurrentIndex(0);
       setIsFlipped(false);
@@ -68,11 +75,15 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
       setCardsEvaluated(0);
       setSelectedOption(null);
       setShowExplanation(false);
-      localStorage.setItem(persistenceKey, JSON.stringify({ cards: aiCards, index: 0 }));
+      setIsTestMode(isRemediation);
+      if (!isRemediation) {
+        localStorage.setItem(persistenceKey, JSON.stringify({ cards: aiCards, index: 0 }));
+      }
       setStatus('active');
     } catch (e) {
       console.error(e);
-      setStatus('setup');
+      if (!isRemediation) setStatus('setup');
+      else onBack();
     } finally {
       setLoading(false);
     }
@@ -145,7 +156,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
     nextCard();
   };
 
-  if (status === 'setup') {
+  if (status === 'setup' && !isRemediation) {
     return (
       <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-10 animate-in zoom-in duration-300">
         <div className="flex flex-col items-center mb-8">
@@ -191,7 +202,9 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
   if (loading) return (
     <div className="flex flex-col items-center animate-in fade-in duration-700">
       <LoadingSpinner />
-      <p className="mt-8 font-black text-primary animate-pulse tracking-widest text-[10px] uppercase">Synthesizing Learning Assets...</p>
+      <p className="mt-8 font-black text-primary animate-pulse tracking-widest text-[10px] uppercase">
+        {isRemediation ? 'SYPHONING WEAKNESS DATA...' : 'Synthesizing Learning Assets...'}
+      </p>
     </div>
   );
 
@@ -232,11 +245,13 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
       <div className="w-full mb-8 flex items-center justify-between px-2">
         <div className="flex flex-col">
           <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-1">
-            {isTestMode ? (isMultipleChoice ? "MULTIPLE CHOICE MODE" : "ACTIVE RECALL MODE") : "PRACTICE SESSION"}
+            {isRemediation ? "REMEDIATION PROTOCOL" : (isTestMode ? (isMultipleChoice ? "MULTIPLE CHOICE MODE" : "ACTIVE RECALL MODE") : "PRACTICE SESSION")}
           </span>
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>
-            <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">Target: {difficulty} • Mastery: {cardsEvaluated > 0 ? Math.round((testScore/cardsEvaluated)*100) : 0}%</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${isRemediation ? 'bg-destructive' : 'bg-green-500'} shadow-[0_0_5px_rgba(34,197,94,0.5)]`}></span>
+            <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">
+                {isRemediation ? 'TARGETING NEURAL GAPS' : `Target: ${difficulty} • Mastery: ${cardsEvaluated > 0 ? Math.round((testScore/cardsEvaluated)*100) : 0}%`}
+            </span>
           </div>
         </div>
         <div className="bg-secondary/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-border shadow-inner">
@@ -349,13 +364,17 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className={`grid grid-cols-1 ${isRemediation ? '' : 'md:grid-cols-3'} gap-3`}>
           <Button onClick={() => setStatus('summary')} variant="ghost" className="text-[9px] uppercase tracking-widest border-border text-destructive hover:bg-destructive/10">END SESSION</Button>
-          <Button onClick={() => setStatus('setup')} variant="ghost" className="text-[9px] uppercase tracking-widest border-border">NEW BATCH</Button>
-          {isTestMode ? (
-            <Button onClick={() => setIsTestMode(false)} variant="secondary" className="text-[9px] uppercase tracking-widest border-border">PRACTICE MODE</Button>
-          ) : (
-            <Button onClick={() => setIsTestMode(true)} variant="secondary" className="text-[9px] uppercase tracking-widest border-primary/20 text-primary bg-primary/5 hover:bg-primary/10">ACTIVE RECALL</Button>
+          {!isRemediation && (
+              <>
+                <Button onClick={() => setStatus('setup')} variant="ghost" className="text-[9px] uppercase tracking-widest border-border">NEW BATCH</Button>
+                {isTestMode ? (
+                    <Button onClick={() => setIsTestMode(false)} variant="secondary" className="text-[9px] uppercase tracking-widest border-border">PRACTICE MODE</Button>
+                ) : (
+                    <Button onClick={() => setIsTestMode(true)} variant="secondary" className="text-[9px] uppercase tracking-widest border-primary/20 text-primary bg-primary/5 hover:bg-primary/10">ACTIVE RECALL</Button>
+                )}
+              </>
           )}
         </div>
       </div>
