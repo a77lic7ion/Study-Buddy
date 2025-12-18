@@ -1,20 +1,42 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 🚀 Universal Adaptive Study Buddy
+### Powered by Gemini 3 Flash AI
 
-# Run and deploy your AI Studio app
+A next-generation, grade-agnostic study platform that adapts to any student, any subject, and any difficulty level. Leveraging the **Google Gemini API**, it generates real-time educational content tailored to specific curriculum requirements.
 
-This contains everything you need to run your app locally.
+---
 
-View your app in AI Studio: https://ai.studio/apps/drive/1QqKRJsarV-9NxjYXMqQeTqSUFqJHxVt_
+## 🌟 Capabilities
 
-## Run Locally
+### 1. **Any Grade, Any Subject**
+Choose from standard grades (1-12) and popular subjects, or enter a custom topic. The AI dynamically adjusts its tone, complexity, and content based on your profile.
 
-**Prerequisites:**  Node.js
+### 2. **AI-Synthesized Flashcards**
+No more manual entry. The system generates high-quality flashcard decks for any topic instantly, focusing on core concepts and retention.
 
+### 3. **Smart Adaptive Quizzes**
+The "Buddy" tracks your performance. If you struggle with *Organic Chemistry* or *Quadratic Equations*, the AI will prioritize those topics in your next 10-question adaptive quiz.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### 4. **Expert Review System**
+Every mistake is a learning opportunity. The AI acts as a 24/7 tutor, providing personalized explanations for every incorrect answer.
+
+---
+
+## 🧠 Technical Highlights
+
+- **Gemini 3 Flash Integration:** High-speed, high-reasoning model for low-latency learning.
+- **Subject-Scoped Persistence:** Weak topics and scores are isolated by subject to prevent cross-contamination of study data.
+- **Strict JSON Schemas:** Ensures 100% reliable UI rendering regardless of the subject complexity.
+- **Mobile-First Design:** Fully responsive Tailwind CSS layout.
+
+---
+
+## 🚦 Getting Started
+
+1. **Profile Setup:** Enter your current grade and the subject you want to master.
+2. **Revise:** Generate a set of flashcards to refresh your memory.
+3. **Test:** Take an adaptive quiz to identify gaps.
+4. **Grow:** Review AI-generated feedback and watch your progress bar climb.
+
+---
+
+*Transforming static studying into a dynamic, AI-powered journey.*

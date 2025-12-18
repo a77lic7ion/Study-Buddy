@@ -1,245 +1,274 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { QuizQuestion, IncorrectAnswer, QuestionReview } from '../types';
+import React, { useState, useCallback, useEffect } from 'react';
+import { QuizQuestion, IncorrectAnswer, QuestionReview, UserProfile } from '../types';
 import { generateQuizQuestions, generateReview } from '../services/geminiService';
 import Button from './Button';
 import LoadingSpinner from './LoadingSpinner';
 import { playCorrectSound, playIncorrectSound } from '../utils/soundUtils';
 
 interface QuizProps {
+  profile: UserProfile;
+  userId: string;
   onBack: () => void;
   onTestComplete: (score: number) => void;
 }
 
-type QuizStatus = 'not_started' | 'loading' | 'in_progress' | 'completed' | 'generating_review' | 'review';
-const WEAK_TOPICS_KEY = 'weakTopics';
-
-const renderWithSVG = (text: string) => {
-    if (typeof text !== 'string' || !text.includes('<svg')) {
-      return text;
-    }
-    const parts = text.split(/(<svg[\s\S]*?<\/svg>)/g);
-    return (
-      <span className="flex items-center gap-2 flex-wrap justify-center md:justify-start">
-        {parts.map((part, index) => {
-          if (part.startsWith('<svg')) {
-            const styledPart = part.replace('<svg', '<svg class="inline-block align-middle h-10 w-24 text-white"');
-            return <span key={index} dangerouslySetInnerHTML={{ __html: styledPart }} />;
-          }
-          return part;
-        })}
-      </span>
-    );
-};
-
-const Quiz: React.FC<QuizProps> = ({ onBack, onTestComplete }) => {
-  const [status, setStatus] = useState<QuizStatus>('not_started');
+const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) => {
+  const [status, setStatus] = useState<'loading' | 'active' | 'review' | 'intro'>('intro');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
   const [score, setScore] = useState(0);
-  const [incorrectAnswers, setIncorrectAnswers] = useState<IncorrectAnswer[]>([]);
-  const [reviewData, setReviewData] = useState<QuestionReview[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [incorrect, setIncorrect] = useState<IncorrectAnswer[]>([]);
+  const [reviews, setReviews] = useState<QuestionReview[]>([]);
+  const [focusTopics, setFocusTopics] = useState("");
+  const [hasSavedSession, setHasSavedSession] = useState(false);
 
-  const weakTopics = useMemo(() => {
-    try {
-      const storedTopics = localStorage.getItem(WEAK_TOPICS_KEY);
-      return storedTopics ? JSON.parse(storedTopics) : [];
-    } catch {
-      return [];
+  const sessionKey = `quiz_session_${userId}_${profile.grade}_${profile.subject}`;
+
+  // Check for saved session on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(sessionKey);
+    if (saved) {
+      setHasSavedSession(true);
     }
-  }, [status]); // Reread topics when a new quiz starts
+  }, [sessionKey]);
 
-  const startQuiz = useCallback(async () => {
+  const saveProgress = useCallback((updatedIndex: number, updatedScore: number, updatedIncorrect: IncorrectAnswer[], currentQuestions: QuizQuestion[]) => {
+    const sessionData = {
+      questions: currentQuestions,
+      currentIndex: updatedIndex,
+      score: updatedScore,
+      incorrect: updatedIncorrect,
+      timestamp: new Date().toISOString()
+    };
+    localStorage.setItem(sessionKey, JSON.stringify(sessionData));
+  }, [sessionKey]);
+
+  const resumeSession = () => {
+    const saved = localStorage.getItem(sessionKey);
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        setQuestions(data.questions);
+        setCurrentIndex(data.currentIndex);
+        setScore(data.score);
+        setIncorrect(data.incorrect);
+        setStatus('active');
+      } catch (e) {
+        console.error("Failed to resume session", e);
+        localStorage.removeItem(sessionKey);
+        setHasSavedSession(false);
+      }
+    }
+  };
+
+  const start = async () => {
     setStatus('loading');
-    setError(null);
-    setIncorrectAnswers([]);
-    setReviewData(null);
+    const weakKey = `weakTopics_${userId}_${profile.grade}_${profile.subject}`;
+    const weakTopics = JSON.parse(localStorage.getItem(weakKey) || '[]');
+    const topicsArray = focusTopics.split(',').map(t => t.trim()).filter(t => t.length > 0);
+    
     try {
-      const generatedQuestions = await generateQuizQuestions(weakTopics);
-      setQuestions(generatedQuestions);
-      setCurrentQuestionIndex(0);
+      const qs = await generateQuizQuestions(profile, weakTopics, topicsArray);
+      setQuestions(qs);
       setScore(0);
-      setSelectedAnswer(null);
-      setStatus('in_progress');
-    } catch (err) {
-      setError('Failed to generate the quiz. Please try again.');
-      setStatus('not_started');
-      console.error(err);
+      setCurrentIndex(0);
+      setIncorrect([]);
+      setSelected(null);
+      saveProgress(0, 0, [], qs);
+      setStatus('active');
+    } catch (e) {
+      console.error(e);
+      setStatus('intro');
     }
-  }, [weakTopics]);
-  
-  useEffect(() => {
-    const handleQuizCompletion = async () => {
-      if (status === 'completed' && questions.length > 0) {
-        const percentage = Math.round((score / questions.length) * 100);
-        onTestComplete(percentage);
+  };
 
-        // Update weak topics based on this quiz's results
-        const newWeakTopics = incorrectAnswers.map(ia => ia.question.topic);
-        const updatedTopics = [...weakTopics, ...newWeakTopics].slice(-10); // Keep last 10 weak topics
-        localStorage.setItem(WEAK_TOPICS_KEY, JSON.stringify(updatedTopics));
-
-        setStatus('generating_review');
-      }
-    };
-    handleQuizCompletion();
-  }, [status, score, questions.length, onTestComplete, incorrectAnswers, weakTopics]);
-
-  useEffect(() => {
-    const fetchReview = async () => {
-      if (status === 'generating_review') {
-        if (incorrectAnswers.length > 0) {
-          const review = await generateReview(incorrectAnswers);
-          setReviewData(review);
-        }
-        setStatus('review');
-      }
-    };
-    fetchReview();
-  }, [status, incorrectAnswers]);
-
-  const handleAnswerSelect = (answer: string) => {
-    if (selectedAnswer) return;
-
-    setSelectedAnswer(answer);
-    const question = questions[currentQuestionIndex];
-    const correct = answer === question.correctAnswer;
+  const handleAnswer = (opt: string) => {
+    if (selected) return;
+    setSelected(opt);
+    const correct = opt === questions[currentIndex].correctAnswer;
     
+    let nextScore = score;
+    let nextIncorrect = [...incorrect];
+
     if (correct) {
+      nextScore = score + 1;
+      setScore(nextScore);
       playCorrectSound();
-      setScore(prev => prev + 1);
     } else {
+      nextIncorrect = [...incorrect, { question: questions[currentIndex], userAnswer: opt }];
+      setIncorrect(nextIncorrect);
       playIncorrectSound();
-      setIncorrectAnswers(prev => [...prev, { question, userAnswer: answer }]);
     }
+
+    saveProgress(currentIndex, nextScore, nextIncorrect, questions);
   };
 
-  const nextQuestion = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
-      setSelectedAnswer(null);
+  const next = async () => {
+    if (currentIndex < questions.length - 1) {
+      const nextIdx = currentIndex + 1;
+      setCurrentIndex(nextIdx);
+      setSelected(null);
+      saveProgress(nextIdx, score, incorrect, questions);
     } else {
-      setStatus('completed');
+      const finalScore = Math.round((score / questions.length) * 100);
+      onTestComplete(finalScore);
+      
+      // Clear session as it is completed
+      localStorage.removeItem(sessionKey);
+
+      const weakKey = `weakTopics_${userId}_${profile.grade}_${profile.subject}`;
+      const existing = JSON.parse(localStorage.getItem(weakKey) || '[]');
+      const newlyWeak = incorrect.map(i => i.question.topic);
+      const combined = Array.from(new Set([...existing, ...newlyWeak])).slice(-20);
+      localStorage.setItem(weakKey, JSON.stringify(combined));
+
+      if (incorrect.length > 0) {
+        setStatus('loading');
+        try {
+          const feedback = await generateReview(incorrect, profile);
+          setReviews(feedback);
+        } catch (e) {
+          console.error("Failed to generate review", e);
+        }
+      }
+      setStatus('review');
     }
   };
 
-  const getButtonClass = (option: string) => {
-    if (!selectedAnswer) return 'bg-slate-700 hover:bg-slate-600';
-    
-    const isCorrectAnswer = option === questions[currentQuestionIndex].correctAnswer;
-    const isSelectedAnswer = option === selectedAnswer;
+  if (status === 'loading') return <div className="text-center animate-pulse"><LoadingSpinner /><p className="mt-4 font-black uppercase tracking-widest text-cyan-400">AI Tutor is preparing your lesson...</p></div>;
 
-    if (isCorrectAnswer) return 'bg-green-600 text-white ring-2 ring-green-400';
-    if (isSelectedAnswer) return 'bg-red-600 text-white'; // Incorrect selection
-    
-    return 'bg-slate-700 opacity-50 cursor-not-allowed';
-  };
-
-  if (status === 'loading') {
-    return (
-      <div className="text-center">
-        <LoadingSpinner />
-        <p className="mt-4 text-lg text-slate-300">Generating your personalized quiz...</p>
+  if (status === 'intro') return (
+    <div className="text-center bg-slate-800 p-8 rounded-[2.5rem] border-2 border-slate-700 max-w-lg mx-auto shadow-2xl animate-in zoom-in duration-300">
+      <h2 className="text-3xl font-black italic uppercase mb-2 tracking-tighter">Simulation Ready</h2>
+      <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-6">Target: {profile.subject}</p>
+      
+      <div className="mb-8 text-left">
+        <label className="block text-[10px] font-black uppercase text-slate-500 mb-2 tracking-widest ml-2">Focus Topics (Optional)</label>
+        <input 
+          type="text"
+          value={focusTopics}
+          onChange={(e) => setFocusTopics(e.target.value)}
+          placeholder="e.g. Photosynthesis, Circuits..."
+          className="w-full bg-slate-900 border-2 border-slate-700 rounded-2xl p-4 text-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all placeholder:text-slate-700"
+        />
+        <p className="text-[9px] text-slate-600 mt-2 ml-2 italic">Separate topics with commas for best results.</p>
       </div>
-    );
-  }
 
-  if (status === 'generating_review') {
-    return (
-      <div className="text-center">
-        <LoadingSpinner />
-        <p className="mt-4 text-lg text-slate-300">Analyzing your answers and preparing feedback...</p>
+      <div className="flex flex-col gap-4">
+        <Button onClick={start} size="lg" className="w-full py-5 text-xl shadow-lg bg-cyan-600 hover:bg-cyan-700">Begin Assessment</Button>
+        {hasSavedSession && (
+          <Button onClick={resumeSession} variant="secondary" className="w-full py-4 bg-indigo-600 hover:bg-indigo-700">Resume Last Session</Button>
+        )}
+        <Button onClick={onBack} variant="ghost" className="w-full border-slate-700">Abort Mission</Button>
       </div>
-    );
-  }
-  
-  if (status === 'review' || status === 'completed') {
-    const percentage = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
-    return (
-      <div className="text-center bg-slate-800 p-6 md:p-8 rounded-lg shadow-xl w-full max-w-3xl mx-auto">
-        <h2 className="text-3xl font-bold mb-4 text-cyan-400">Quiz Complete!</h2>
-        <p className="text-xl mb-2 text-slate-200">Your Score:</p>
-        <p className="text-6xl font-bold mb-6 text-white">{percentage}%</p>
-        <p className="text-lg text-slate-300 mb-8">You answered {score} out of {questions.length} questions correctly.</p>
+    </div>
+  );
 
-        {reviewData && reviewData.length > 0 && (
-          <div className="mt-10 text-left">
-            <h3 className="text-2xl font-bold mb-6 text-cyan-400 text-center">Let's Review Your Answers</h3>
-            <div className="space-y-6">
-              {reviewData.map((item, index) => (
-                <div key={index} className="bg-slate-900 p-4 rounded-lg border border-slate-700">
-                  <p className="font-semibold text-lg mb-2 text-slate-200">{renderWithSVG(item.question)}</p>
-                  <p className="text-red-400 mb-1 pl-4 border-l-4 border-red-400">Your answer: {renderWithSVG(item.userAnswer)}</p>
-                  <p className="text-green-400 mb-3 pl-4 border-l-4 border-green-400">Correct answer: {renderWithSVG(item.correctAnswer)}</p>
-                  <div className="bg-slate-800 p-3 rounded-md">
-                    <p className="text-cyan-300 font-bold text-sm">💡 Explanation</p>
-                    <p className="text-slate-300">{item.explanation}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+  if (status === 'review') return (
+    <div className="w-full max-w-2xl mx-auto space-y-6 animate-in fade-in duration-500">
+      <div className="text-center mb-8 bg-slate-800 p-8 rounded-3xl border-2 border-slate-700 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500"></div>
+        <h2 className="text-7xl font-black text-cyan-400 mb-2 drop-shadow-lg">{Math.round((score/questions.length)*100)}%</h2>
+        <p className="text-slate-500 font-black uppercase tracking-[0.4em] text-[10px]">Overall Mastery Score</p>
+      </div>
+      <h3 className="text-xl font-black uppercase text-slate-300 border-l-4 border-cyan-500 pl-4 tracking-widest mb-6">Expert Briefing</h3>
+      {reviews.length > 0 ? reviews.map((r, i) => (
+        <div key={i} className="bg-slate-800 p-6 rounded-3xl border border-slate-700 animate-in slide-in-from-bottom-6 duration-500" style={{ animationDelay: `${i * 150}ms` }}>
+          <p className="font-bold text-lg mb-6 text-white leading-snug">{r.question}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+             <div className="bg-red-950/30 p-4 rounded-2xl border border-red-500/30 shadow-inner">
+               <span className="text-[10px] font-black uppercase text-red-400 block mb-2 tracking-widest">Your Result</span>
+               <p className="text-red-200 font-black">{r.userAnswer}</p>
+             </div>
+             <div className="bg-green-950/30 p-4 rounded-2xl border border-green-500/30 shadow-inner">
+               <span className="text-[10px] font-black uppercase text-green-400 block mb-2 tracking-widest">Correct Solution</span>
+               <p className="text-green-200 font-black">{r.correctAnswer}</p>
+             </div>
           </div>
-        )}
-        {incorrectAnswers.length === 0 && (
-             <p className="text-2xl font-bold text-green-400 my-8">🎉 Congratulations, you got a perfect score! 🎉</p>
-        )}
-
-        <div className="flex gap-4 justify-center mt-10">
-          <Button onClick={startQuiz}>Take a New Quiz</Button>
-          <Button onClick={onBack} variant="ghost">Back to Home</Button>
-        </div>
-      </div>
-    );
-  }
-
-
-  if (status === 'in_progress') {
-    const question = questions[currentQuestionIndex];
-    return (
-      <div className="bg-slate-800 p-6 md:p-8 rounded-lg shadow-xl w-full">
-        <div className="mb-6">
-            <div className="flex justify-between items-center mb-2">
-                <p className="text-sm font-semibold text-cyan-400">Question {currentQuestionIndex + 1} of {questions.length}</p>
-                <p className="text-sm font-semibold text-slate-300">Score: {score}</p>
-            </div>
-            <div className="w-full bg-slate-700 rounded-full h-2.5">
-                <div className="bg-cyan-500 h-2.5 rounded-full" style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}></div>
-            </div>
-        </div>
-        <div className="text-xl md:text-2xl font-bold mb-6 text-slate-100 whitespace-pre-wrap">{renderWithSVG(question.question)}</div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {question.options.map((option) => (
-            <button
-              key={option}
-              onClick={() => handleAnswerSelect(option)}
-              disabled={!!selectedAnswer}
-              className={`p-4 rounded-lg text-left transition-all duration-200 w-full ${getButtonClass(option)}`}
-            >
-              {renderWithSVG(option)}
-            </button>
-          ))}
-        </div>
-        {selectedAnswer && (
-          <div className="text-right">
-            <Button onClick={nextQuestion}>
-              {currentQuestionIndex < questions.length - 1 ? 'Next Question' : 'Finish & Review'}
-            </Button>
+          <div className="bg-slate-900 p-6 rounded-2xl text-sm text-slate-300 border-l-4 border-cyan-500 shadow-2xl leading-relaxed italic">
+            <span className="block text-cyan-400 font-black uppercase text-[10px] mb-4 tracking-[0.2em] not-italic">AI Tutor Feedback</span>
+            {r.explanation}
           </div>
-        )}
-      </div>
-    );
-  }
+        </div>
+      )) : incorrect.length > 0 && <p className="text-slate-500 italic">Compiling review data...</p>}
+      <Button onClick={onBack} size="lg" className="w-full py-6 text-xl mt-12 bg-indigo-600 hover:bg-indigo-700 shadow-indigo-900/40 shadow-xl">Complete & Sync</Button>
+    </div>
+  );
 
+  const q = questions[currentIndex];
   return (
-    <div className="text-center">
-      <h2 className="text-3xl font-bold mb-4 text-slate-200">Ready to Test Your Knowledge?</h2>
-      <p className="text-lg text-slate-400 mb-8 max-w-xl mx-auto">A personalized 10-question quiz will be generated, focusing on topics you've found tricky before.</p>
-      {error && <p className="text-red-400 mb-4">{error}</p>}
-      <div className="flex gap-4 justify-center">
-        <Button onClick={startQuiz} size="lg">Generate Quiz</Button>
-        <Button onClick={onBack} variant="ghost">Back to Home</Button>
+    <div className="bg-slate-800 p-8 rounded-[2.5rem] border-2 border-slate-700 w-full max-w-2xl mx-auto shadow-2xl relative overflow-hidden">
+      <div className="flex justify-between items-center mb-12">
+        <div className="flex flex-col">
+          <span className="text-cyan-500 font-black tracking-[0.2em] text-[10px] uppercase mb-1">Assessment In Progress</span>
+          <span className="text-white text-2xl font-black italic">{currentIndex+1} <span className="text-slate-600 text-sm font-normal">/ {questions.length}</span></span>
+        </div>
+        <div className="w-48 bg-slate-900 h-3 rounded-full overflow-hidden border border-slate-700 shadow-inner p-0.5">
+          <div className="bg-cyan-500 h-full rounded-full transition-all duration-1000 ease-in-out shadow-[0_0_10px_rgba(6,182,212,0.5)]" style={{width: `${((currentIndex+1)/questions.length)*100}%`}}></div>
+        </div>
       </div>
+      
+      <div className="mb-4">
+         <span className="text-[10px] font-black uppercase bg-slate-900/50 border border-slate-700 px-4 py-1.5 rounded-full text-slate-400 tracking-widest inline-block">{q.topic}</span>
+      </div>
+      <h3 className="text-2xl md:text-3xl font-black mb-12 text-white leading-tight drop-shadow-sm">{q.question}</h3>
+      
+      <div className="grid grid-cols-1 gap-4 mb-12">
+        {q.options.map(opt => {
+          const isSelected = selected === opt;
+          const isCorrect = opt === q.correctAnswer;
+          let color = 'bg-slate-900/50 border-slate-700 hover:border-slate-500 hover:bg-slate-800 transition-all';
+          
+          if (selected) {
+            if (isCorrect) {
+              color = 'bg-green-600 border-green-400 text-white shadow-xl shadow-green-900/40 scale-[1.03] z-10';
+            } else if (isSelected) {
+              color = 'bg-red-600 border-red-400 text-white shadow-xl shadow-red-900/40';
+            } else {
+              color = 'bg-slate-900/20 border-slate-800 opacity-30';
+            }
+          }
+          
+          return (
+            <button 
+              key={opt} 
+              onClick={() => handleAnswer(opt)} 
+              disabled={!!selected}
+              className={`p-6 rounded-[1.25rem] border-2 text-left transition-all duration-300 font-bold group relative overflow-hidden ${color}`}
+            >
+              <div className="relative z-10 flex justify-between items-center">
+                <span className="flex-1 pr-4">{opt}</span>
+                {selected && isCorrect && (
+                  <div className="bg-white/20 p-1.5 rounded-full animate-in zoom-in duration-300">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+                {selected && isSelected && !isCorrect && (
+                  <div className="bg-white/20 p-1.5 rounded-full animate-in zoom-in duration-300">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {selected && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className={`mb-8 p-5 rounded-2xl border-2 text-center font-black uppercase tracking-[0.3em] shadow-inner text-xs ${selected === q.correctAnswer ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+             {selected === q.correctAnswer ? 'Success Identified' : 'Inaccuracy Detected'}
+          </div>
+          <Button onClick={next} className="w-full py-6 text-xl shadow-2xl bg-cyan-600 hover:bg-cyan-700">
+            {currentIndex === questions.length - 1 ? 'End Assessment' : 'Proceed to Next'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,29 +1,36 @@
 export interface Flashcard {
   term: string;
   definition: string;
-  symbol?: string; // For visual representation of circuit symbols
 }
 
 export interface QuizQuestion {
   question: string;
   options: string[];
   correctAnswer: string;
-  topic: string; // To enable adaptive learning
+  topic: string;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  password?: string; // Only for local simulation
+  profile?: UserProfile;
 }
 
 export interface TestResult {
-  score: number; // Percentage
-  date: string; // ISO string date
+  score: number;
+  date: string;
   type: 'quiz' | 'flashcard';
+  subject: string;
+  grade: string;
+  userId: string;
 }
 
-// New type for tracking incorrect answers
 export interface IncorrectAnswer {
   question: QuizQuestion;
   userAnswer: string;
 }
 
-// New type for the generated review
 export interface QuestionReview {
   question: string;
   correctAnswer: string;
@@ -31,9 +38,16 @@ export interface QuestionReview {
   explanation: string;
 }
 
+export interface UserProfile {
+  grade: string;
+  subject: string;
+}
 
 export enum AppView {
+  AUTH,
+  SETUP,
   HOME,
   FLASHCARDS,
   QUIZ,
+  PROFILE
 }
