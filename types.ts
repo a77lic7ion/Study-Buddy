@@ -44,6 +44,7 @@ export interface UserProfile {
 }
 
 export enum AppView {
+  INTRO,
   AUTH,
   SETUP,
   HOME,

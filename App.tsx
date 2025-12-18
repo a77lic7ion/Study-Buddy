@@ -8,23 +8,35 @@ import ProgressGraph from './components/ProgressGraph';
 import SetupView from './components/SetupView';
 import AuthView from './components/AuthView';
 import ProfileView from './components/ProfileView';
+import IntroSequence from './components/IntroSequence';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [currentView, setCurrentView] = useState<AppView>(AppView.AUTH);
+  const [currentView, setCurrentView] = useState<AppView>(AppView.INTRO);
   const [testScores, setTestScores] = useState<TestResult[]>([]);
 
   useEffect(() => {
+    const hasSeenIntro = localStorage.getItem('hasSeenIntro');
     const storedUser = localStorage.getItem('currentUser');
+    
     if (storedUser) {
       const user = JSON.parse(storedUser);
       setCurrentUser(user);
+      // If we have a user, skip intro
       setCurrentView(user.profile ? AppView.HOME : AppView.SETUP);
+    } else if (hasSeenIntro) {
+      // If intro seen but no user, go to Auth
+      setCurrentView(AppView.AUTH);
     }
 
     const storedScores = localStorage.getItem('testScores');
     if (storedScores) setTestScores(JSON.parse(storedScores));
   }, []);
+
+  const handleIntroComplete = () => {
+    localStorage.setItem('hasSeenIntro', 'true');
+    setCurrentView(AppView.AUTH);
+  };
 
   const handleAuthComplete = (user: User) => {
     setCurrentUser(user);
@@ -77,6 +89,10 @@ const App: React.FC = () => {
   const subjectScores = userScores.filter(s => s.subject === currentUser?.profile?.subject);
 
   const renderContent = () => {
+    if (currentView === AppView.INTRO) {
+      return <IntroSequence onComplete={handleIntroComplete} />;
+    }
+
     if (currentView === AppView.AUTH) {
       return <AuthView onAuthComplete={handleAuthComplete} />;
     }
@@ -179,7 +195,7 @@ const App: React.FC = () => {
         onLogout={handleLogout} 
         onProfile={() => setCurrentView(AppView.PROFILE)} 
         onHome={() => setCurrentView(AppView.HOME)}
-        showNav={currentView !== AppView.AUTH}
+        showNav={currentView !== AppView.AUTH && currentView !== AppView.INTRO}
       />
       
       <main className="flex-grow flex flex-col px-4 py-12 relative z-0">
