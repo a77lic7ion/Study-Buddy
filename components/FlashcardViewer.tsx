@@ -57,6 +57,8 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
       const aiCards = await generateFlashcards(profile, difficulty);
       setCards(aiCards);
       setCurrentIndex(0);
+      setIsFlipped(false);
+      setShowAnswer(false);
       localStorage.setItem(persistenceKey, JSON.stringify({ cards: aiCards, index: 0 }));
     } catch (e) {
       console.error(e);
@@ -66,27 +68,32 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
     }
   };
 
-  const nextCard = () => {
-    if (currentIndex < cards.length - 1 && !isTransitioning) {
-      setIsTransitioning(true);
+  const handleCardChange = (newIndex: number) => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
+    
+    // Smooth exit then data swap
+    setTimeout(() => {
+      setCurrentIndex(newIndex);
+      setIsFlipped(false);
+      setShowAnswer(false);
+      
+      // Allow a small delay for state to settle before showing new card
       setTimeout(() => {
-        setCurrentIndex(i => i + 1);
-        setIsFlipped(false);
-        setShowAnswer(false);
         setIsTransitioning(false);
-      }, 300);
+      }, 50);
+    }, 250);
+  };
+
+  const nextCard = () => {
+    if (currentIndex < cards.length - 1) {
+      handleCardChange(currentIndex + 1);
     }
   };
 
   const prevCard = () => {
-    if (currentIndex > 0 && !isTransitioning) {
-      setIsTransitioning(true);
-      setTimeout(() => {
-        setCurrentIndex(i => i - 1);
-        setIsFlipped(false);
-        setShowAnswer(false);
-        setIsTransitioning(false);
-      }, 300);
+    if (currentIndex > 0) {
+      handleCardChange(currentIndex - 1);
     }
   };
 
@@ -115,18 +122,18 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
             <span className="material-icons-round text-3xl">psychology</span>
           </div>
           <h2 className="text-2xl font-bold mb-2">Configure Deck</h2>
-          <p className="text-sm text-muted-foreground font-medium text-center italic">Calibrating AI difficulty for {profile.subject}...</p>
+          <p className="text-sm text-muted-foreground font-medium text-center italic">Calibrating difficulty for {profile.subject}...</p>
         </div>
         
         <div className="space-y-6">
           <div className="space-y-3">
-            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest ml-1">Difficulty Level</label>
+            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest ml-1">Complexity Level</label>
             <div className="grid grid-cols-3 gap-2">
               {(['Easy', 'Medium', 'Hard'] as Difficulty[]).map((level) => (
                 <button
                   key={level}
                   onClick={() => setDifficulty(level)}
-                  className={`py-3 rounded-lg border font-bold text-xs uppercase transition-all tracking-wider ${
+                  className={`py-3 rounded-lg border font-bold text-[10px] uppercase transition-all tracking-wider ${
                     difficulty === level 
                       ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20' 
                       : 'bg-background border-border text-muted-foreground hover:border-primary/50'
@@ -139,11 +146,11 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
           </div>
 
           <div className="flex flex-col gap-3 pt-4">
-            <Button onClick={startSession} size="lg" className="w-full">
-              GENERATE DECK
+            <Button onClick={startSession} size="lg" className="w-full text-xs tracking-[0.2em]">
+              GENERATE NEURAL DECK
             </Button>
-            <Button onClick={onBack} variant="ghost" className="w-full">
-              CANCEL
+            <Button onClick={onBack} variant="ghost" className="w-full text-xs tracking-widest">
+              RETURN HOME
             </Button>
           </div>
         </div>
@@ -152,108 +159,140 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
   }
 
   if (loading) return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center animate-in fade-in duration-700">
       <LoadingSpinner />
-      <p className="mt-8 font-bold text-primary animate-pulse tracking-widest text-xs uppercase">Forging Neural Links...</p>
+      <p className="mt-8 font-bold text-primary animate-pulse tracking-widest text-[10px] uppercase">Synthesizing Learning Assets...</p>
     </div>
   );
 
   const currentCard = cards[currentIndex];
 
   return (
-    <div className={`w-full max-w-xl mx-auto flex flex-col items-center transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
-      <div className="w-full mb-8 flex items-center justify-between">
+    <div className="w-full max-w-xl mx-auto flex flex-col items-center animate-in fade-in slide-in-from-bottom-6 duration-700">
+      {/* Session Metadata */}
+      <div className="w-full mb-8 flex items-center justify-between px-2">
         <div className="flex flex-col">
           <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-1">
-            {isTestMode ? "ACTIVE RECALL" : "REVISION MODE"}
+            {isTestMode ? "ACTIVE RECALL MODE" : "PRACTICE SESSION"}
           </span>
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-            <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">Level: {difficulty}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>
+            <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">Target: {difficulty}</span>
           </div>
         </div>
-        <div className="bg-secondary px-4 py-2 rounded-lg border border-border">
-          <span className="text-xs font-bold tracking-widest font-mono">
+        <div className="bg-secondary/80 backdrop-blur-sm px-4 py-2 rounded-lg border border-border shadow-inner">
+          <span className="text-[10px] font-bold tracking-[0.2em] font-mono">
             {currentIndex + 1} <span className="text-muted-foreground">/</span> {cards.length}
           </span>
         </div>
       </div>
 
+      {/* Main Flashcard with Flip logic */}
       <div className="w-full mb-10 group" style={{ perspective: '2000px' }}>
         <div 
-          className={`relative w-full h-[22rem] transition-all duration-700 ease-in-out preserve-3d cursor-pointer ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}
-          onClick={() => setIsFlipped(!isFlipped)}
+          className={`relative w-full h-[22rem] transition-all duration-700 ease-out preserve-3d cursor-pointer 
+            ${isFlipped ? '[transform:rotateY(180deg)]' : ''} 
+            ${isTransitioning ? 'opacity-0 scale-95 -translate-y-4' : 'opacity-100 scale-100 translate-y-0'}`}
+          onClick={() => !isTransitioning && setIsFlipped(!isFlipped)}
         >
-          {/* Front: Question */}
+          {/* Front: Question Side */}
           <div 
-            className={`absolute inset-0 bg-card border border-border rounded-xl shadow-2xl flex flex-col items-center justify-center p-12 text-center backface-hidden ring-1 ring-white/5`}
+            className={`absolute inset-0 bg-card border border-border rounded-xl shadow-2xl flex flex-col items-center justify-center p-12 text-center backface-hidden ring-1 ring-white/5 transition-opacity duration-300
+              ${isFlipped ? 'opacity-0' : 'opacity-100'}`}
             style={{ zIndex: isFlipped ? 0 : 1 }}
           >
-             <div className="absolute top-6 left-1/2 -translate-x-1/2 px-3 py-1 bg-secondary border border-border rounded-full">
-               <span className="text-[8px] font-black uppercase tracking-[0.3em] text-muted-foreground">QUERY</span>
+             <div className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-secondary border border-border rounded-full shadow-sm">
+               <span className="text-[8px] font-black uppercase tracking-[0.3em] text-muted-foreground">QUESTION</span>
              </div>
-             <div className="absolute bottom-4 right-6 opacity-5 select-none pointer-events-none">
-                <span className="material-icons-round text-9xl">help_outline</span>
+             <div className="absolute bottom-6 right-8 opacity-5 select-none pointer-events-none">
+                <span className="material-icons-round text-8xl">contact_support</span>
              </div>
-             <h2 className="text-xl md:text-2xl font-bold leading-tight text-foreground relative z-10">{currentCard?.term}</h2>
+             <h2 className="text-xl md:text-2xl font-bold leading-tight text-foreground relative z-10 antialiased">
+                {currentCard?.term}
+             </h2>
           </div>
 
-          {/* Back: Answer */}
+          {/* Back: Answer Side */}
           <div 
-            className={`absolute inset-0 bg-primary/5 border border-primary/20 rounded-xl shadow-2xl flex flex-col items-center justify-center p-12 text-center backface-hidden [transform:rotateY(180deg)] ring-1 ring-primary/20`}
+            className={`absolute inset-0 bg-primary/5 border border-primary/20 rounded-xl shadow-2xl flex flex-col items-center justify-center p-12 text-center backface-hidden [transform:rotateY(180deg)] ring-1 ring-primary/20 transition-opacity duration-300
+              ${isFlipped ? 'opacity-100' : 'opacity-0'}`}
             style={{ zIndex: isFlipped ? 1 : 0 }}
           >
-             <div className="absolute top-6 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary/20 border border-primary/30 rounded-full">
-               <span className="text-[8px] font-black uppercase tracking-[0.3em] text-primary">RESPONSE</span>
+             <div className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-primary/20 border border-primary/30 rounded-full shadow-sm">
+               <span className="text-[8px] font-black uppercase tracking-[0.3em] text-primary">DEFINITION</span>
              </div>
-             <div className="absolute bottom-4 left-6 opacity-5 select-none pointer-events-none">
-                <span className="material-icons-round text-9xl">task_alt</span>
+             <div className="absolute bottom-6 left-8 opacity-5 select-none pointer-events-none">
+                <span className="material-icons-round text-8xl">auto_awesome</span>
              </div>
-             <p className="text-base md:text-lg font-medium leading-relaxed text-foreground relative z-10">{currentCard?.definition}</p>
+             <p className="text-base md:text-lg font-medium leading-relaxed text-foreground relative z-10 antialiased max-w-sm">
+                {currentCard?.definition}
+             </p>
           </div>
         </div>
       </div>
 
+      {/* Control Interface */}
       <div className="w-full space-y-6">
         {isTestMode ? (
-          <div className="space-y-4 animate-in slide-in-from-bottom-2">
+          <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
             {!showAnswer ? (
-              <Button onClick={() => {setShowAnswer(true); setIsFlipped(true);}} size="lg" className="w-full py-5 text-sm uppercase tracking-widest bg-white text-black hover:bg-white/90">
-                Reveal Response
+              <Button onClick={() => {setShowAnswer(true); setIsFlipped(true);}} size="lg" className="w-full py-5 text-[10px] uppercase tracking-[0.3em] bg-white text-black hover:bg-white/90 shadow-xl">
+                REVEAL ANSWER
               </Button>
             ) : (
               <div className="grid grid-cols-2 gap-4">
-                <Button onClick={() => handleTestAnswer(true)} variant="primary" className="py-5 text-sm uppercase">Knew It</Button>
-                <Button onClick={() => handleTestAnswer(false)} variant="secondary" className="py-5 text-sm uppercase">Reviewing</Button>
+                <Button onClick={() => handleTestAnswer(true)} variant="primary" className="py-5 text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-primary/20">
+                  CORRECT RECALL
+                </Button>
+                <Button onClick={() => handleTestAnswer(false)} variant="secondary" className="py-5 text-[10px] uppercase tracking-[0.2em]">
+                  NEEDS REVIEW
+                </Button>
               </div>
             )}
           </div>
         ) : (
-          <div className="bg-secondary/50 border border-border p-4 rounded-xl flex items-center justify-between backdrop-blur-sm">
-            <button onClick={prevCard} disabled={currentIndex === 0 || isTransitioning} className="p-3 hover:text-primary transition-colors disabled:opacity-30">
-              <span className="material-icons-round">navigate_before</span>
+          <div className="bg-secondary/40 border border-border p-4 rounded-xl flex items-center justify-between backdrop-blur-md shadow-lg">
+            <button 
+              onClick={prevCard} 
+              disabled={currentIndex === 0 || isTransitioning} 
+              className="p-3 text-muted-foreground hover:text-primary transition-all disabled:opacity-20 active:scale-90"
+            >
+              <span className="material-icons-round">arrow_back_ios_new</span>
             </button>
             <div className="flex flex-col items-center gap-3">
-              <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Progress</span>
+              <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-[0.3em]">PROGRESS INDEX</span>
               <div className="flex gap-1.5">
                 {cards.map((_, i) => (
-                  <div key={i} className={`h-1 rounded-full transition-all duration-500 ${i === currentIndex ? 'bg-primary w-6 shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'bg-border w-1.5'}`}></div>
+                  <div key={i} className={`h-1 rounded-full transition-all duration-700 ${i === currentIndex ? 'bg-primary w-8 shadow-[0_0_8px_rgba(99,102,241,0.6)]' : 'bg-border w-1.5'}`}></div>
                 ))}
               </div>
             </div>
-            <button onClick={nextCard} disabled={currentIndex === cards.length - 1 || isTransitioning} className="p-3 hover:text-primary transition-colors disabled:opacity-30">
-              <span className="material-icons-round">navigate_next</span>
+            <button 
+              onClick={nextCard} 
+              disabled={currentIndex === cards.length - 1 || isTransitioning} 
+              className="p-3 text-muted-foreground hover:text-primary transition-all disabled:opacity-20 active:scale-90"
+            >
+              <span className="material-icons-round">arrow_forward_ios</span>
             </button>
           </div>
         )}
 
+        {/* Global Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Button onClick={onBack} variant="ghost" className="text-xs uppercase">Abort</Button>
-          <Button onClick={() => setPreSetup(true)} variant="ghost" className="text-xs uppercase">New Mission</Button>
+          <Button onClick={onBack} variant="ghost" className="text-[9px] uppercase tracking-widest border-border hover:border-destructive/30 hover:text-destructive">
+            EXIT SESSION
+          </Button>
+          <Button onClick={() => setPreSetup(true)} variant="ghost" className="text-[9px] uppercase tracking-widest border-border">
+            CONFIGURE NEW
+          </Button>
           {isTestMode ? (
-            <Button onClick={() => setIsTestMode(false)} variant="secondary" className="text-xs uppercase">Revision Mode</Button>
+            <Button onClick={() => setIsTestMode(false)} variant="secondary" className="text-[9px] uppercase tracking-widest border-border shadow-sm">
+              PRACTICE MODE
+            </Button>
           ) : (
-            <Button onClick={() => setIsTestMode(true)} variant="secondary" className="text-xs uppercase border-primary/20 text-primary">Recall Sequence</Button>
+            <Button onClick={() => setIsTestMode(true)} variant="secondary" className="text-[9px] uppercase tracking-widest border-primary/20 text-primary bg-primary/5 hover:bg-primary/10 shadow-lg shadow-primary/5">
+              ACTIVE RECALL
+            </Button>
           )}
         </div>
       </div>

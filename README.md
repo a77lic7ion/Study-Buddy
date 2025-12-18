@@ -1,42 +1,50 @@
-# 🚀 Universal Adaptive Study Buddy
-### Powered by Gemini 3 Flash AI
+# 🚀 StudyBuddy AI: Adaptive Neural Assessment Engine
+### Powered by Gemini 3 Flash & Pro AI Models
 
-A next-generation, grade-agnostic study platform that adapts to any student, any subject, and any difficulty level. Leveraging the **Google Gemini API**, it generates real-time educational content tailored to specific curriculum requirements.
-
----
-
-## 🌟 Capabilities
-
-### 1. **Any Grade, Any Subject**
-Choose from standard grades (1-12) and popular subjects, or enter a custom topic. The AI dynamically adjusts its tone, complexity, and content based on your profile.
-
-### 2. **AI-Synthesized Flashcards**
-No more manual entry. The system generates high-quality flashcard decks for any topic instantly, focusing on core concepts and retention.
-
-### 3. **Smart Adaptive Quizzes**
-The "Buddy" tracks your performance. If you struggle with *Organic Chemistry* or *Quadratic Equations*, the AI will prioritize those topics in your next 10-question adaptive quiz.
-
-### 4. **Expert Review System**
-Every mistake is a learning opportunity. The AI acts as a 24/7 tutor, providing personalized explanations for every incorrect answer.
+StudyBuddy AI is a high-performance, dark-themed educational platform designed for the modern scholar. It transforms static learning into a dynamic, adaptive experience using cutting-edge Generative AI to synthesize curriculum-specific content on the fly.
 
 ---
 
-## 🧠 Technical Highlights
+## 🌟 Core Features
 
-- **Gemini 3 Flash Integration:** High-speed, high-reasoning model for low-latency learning.
-- **Subject-Scoped Persistence:** Weak topics and scores are isolated by subject to prevent cross-contamination of study data.
-- **Strict JSON Schemas:** Ensures 100% reliable UI rendering regardless of the subject complexity.
-- **Mobile-First Design:** Fully responsive Tailwind CSS layout.
+### 1. **Neural Flashcard Synthesis**
+- **Descriptive Questions:** No more simple terms. The AI generates deep, descriptive questions (e.g., *"How do plants transform light into energy?"* instead of just *"Photosynthesis"*) to trigger actual conceptual recall.
+- **Difficulty Calibration:** Choose between **Easy**, **Medium**, and **Hard** levels to scale the complexity of definitions and terms.
+- **Session Persistence:** Your progress is automatically saved. Exit a session and return exactly where you left off.
+- **3D Interactive Interface:** Fluid flip animations with a specialized tech-forward UI (JetBrains Mono typography).
+
+### 2. **Adaptive AI Quizzes**
+- **Topic-Specific Focus:** Target your weak areas by entering specific focus topics (e.g., *"Thermodynamics"*, *"Ancient Rome"*).
+- **Learning Gaps Identification:** The engine tracks every mistake. It analyzes patterns and identifies specific learning gaps to prioritize in future sessions.
+- **Live AI Feedback:** Every incorrect answer triggers an immediate "Expert Briefing"—personalized explanations from a virtual AI tutor.
+- **Resumable Assessments:** Long quizzes can be paused and resumed later via encrypted local persistence.
+
+### 3. **Scholar Analytics Dashboard**
+- **Neural Growth Tracking:** Visualize your mastery over time with a dynamic progress graph.
+- **Global Average & Attempt Log:** Maintain a permanent record of all assessments across different subjects and grades.
+- **Exportable Transcripts:** Generate a professional visual PDF-ready report of your learning progress, including strengths and weaknesses.
 
 ---
 
-## 🚦 Getting Started
+## 🧠 Technical Architecture
 
-1. **Profile Setup:** Enter your current grade and the subject you want to master.
-2. **Revise:** Generate a set of flashcards to refresh your memory.
-3. **Test:** Take an adaptive quiz to identify gaps.
-4. **Grow:** Review AI-generated feedback and watch your progress bar climb.
+- **Engine:** Built with React 19 and Tailwind CSS, utilizing a custom "High-Tech Dark" design system.
+- **Intelligence:** 
+  - **Gemini 3 Flash-Preview:** Used for high-speed, low-latency content generation (Flashcards & Quizzes).
+  - **Gemini 3 Pro-Preview:** Available for complex reasoning tasks and high-quality image/video supplementary content if required.
+- **Sound Design:** Custom Web Audio API implementation for non-intrusive haptic feedback on correct/incorrect responses.
+- **Persistence:** Subject-scoped `localStorage` logic that ensures data integrity across different academic grades and subjects.
 
 ---
 
-*Transforming static studying into a dynamic, AI-powered journey.*
+## 🚦 Operational Procedures
+
+1. **Initialization:** Define your academic level (Grade 1-12) and primary target subject.
+2. **Review:** Launch an AI Flashcard module to build a foundational conceptual base.
+3. **Assessment:** Trigger a Quiz session to stress-test your knowledge. Use **Focus Topics** for targeted practice.
+4. **Correction:** Study the **Expert Briefing** for any missed questions to bridge learning gaps.
+5. **Certification:** Export your profile once you reach a >90% Mastery Score across your active subjects.
+
+---
+
+*“Transforming cognitive friction into academic momentum.”*
