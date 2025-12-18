@@ -1,20 +1,113 @@
-
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { QuizQuestion, IncorrectAnswer, QuestionReview, Flashcard, UserProfile } from '../types';
+import { QuizQuestion, IncorrectAnswer, QuestionReview, Flashcard, UserProfile, ApiSettings } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+// Default Gemini AI instance using system key
+const getGeminiAI = (apiKey?: string) => new GoogleGenAI({ apiKey: apiKey || (process.env.API_KEY as string) });
+
+const getStoredSettings = (): ApiSettings | null => {
+  const saved = localStorage.getItem('apiSettings');
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      return null;
+    }
+  }
+  return null;
+};
 
 const withRetry = async <T>(fn: () => Promise<T>, retries = 2, delay = 1000): Promise<T> => {
-    try {
-        return await fn();
-    } catch (error) {
-        if (retries > 0) {
-            await new Promise(res => setTimeout(res, delay));
-            return withRetry(fn, retries - 1, delay * 2);
-        } else {
-            throw error;
-        }
+  try {
+    return await fn();
+  } catch (error) {
+    if (retries > 0) {
+      await new Promise(res => setTimeout(res, delay));
+      return withRetry(fn, retries - 1, delay * 2);
+    } else {
+      throw error;
     }
+  }
+};
+
+/**
+ * Orchestrates AI requests across different providers.
+ * If Gemini is selected, it uses the official SDK with structured output.
+ * For others, it uses fetch to communicate with OpenAI-compatible or Ollama endpoints.
+ */
+const requestAI = async (prompt: string, schema: any): Promise<any> => {
+  const settings = getStoredSettings();
+  const activeProvider = settings?.activeProvider || 'gemini';
+  const config = settings?.providers[activeProvider];
+
+  if (activeProvider === 'gemini') {
+    const ai = getGeminiAI(config?.apiKey);
+    const model = config?.selectedModel || "gemini-3-flash-preview";
+
+    const response: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
+      model: model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: schema,
+      },
+    }));
+
+    return JSON.parse(response.text.trim());
+  } else {
+    // Non-Gemini providers (Ollama, OpenAI, Mistral)
+    if (!config || !config.baseUrl) {
+      throw new Error(`Configuration missing for provider: ${activeProvider}`);
+    }
+
+    const isOllama = activeProvider === 'ollama';
+    const endpoint = isOllama 
+      ? `${config.baseUrl}/api/generate` 
+      : `${config.baseUrl}/chat/completions`;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (config.apiKey) {
+      headers['Authorization'] = `Bearer ${config.apiKey}`;
+    }
+
+    // Enhance prompt to enforce JSON structure for providers without native schema support
+    const enhancedPrompt = `${prompt}\n\nIMPORTANT: You MUST respond strictly with valid JSON that matches this schema: ${JSON.stringify(schema)}. Do not include any markdown formatting or extra text.`;
+
+    const body: any = isOllama ? {
+      model: config.selectedModel,
+      prompt: enhancedPrompt,
+      stream: false,
+      format: "json"
+    } : {
+      model: config.selectedModel,
+      messages: [{ role: 'user', content: enhancedPrompt }],
+      response_format: { type: "json_object" }
+    };
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`AI Provider Error (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    
+    // Parse result based on common API response structures
+    let resultString = "";
+    if (isOllama) {
+      resultString = data.response;
+    } else {
+      resultString = data.choices?.[0]?.message?.content || "";
+    }
+
+    return JSON.parse(resultString.trim());
+  }
 };
 
 export const generateFlashcards = async (profile: UserProfile, difficulty: string = 'Medium', count: number = 10): Promise<Flashcard[]> => {
@@ -41,29 +134,19 @@ export const generateFlashcards = async (profile: UserProfile, difficulty: strin
     items: {
       type: Type.OBJECT,
       properties: {
-        term: { type: Type.STRING, description: "A descriptive question about the concept" },
-        definition: { type: Type.STRING, description: "The answer or definition" },
-        explanation: { type: Type.STRING, description: "A concise AI-generated educational breakdown" },
+        term: { type: Type.STRING },
+        definition: { type: Type.STRING },
+        explanation: { type: Type.STRING },
         options: { 
           type: Type.ARRAY, 
-          items: { type: Type.STRING },
-          description: "4 distractors including the correct answer if this is a multiple-choice card"
+          items: { type: Type.STRING }
         }
       },
       required: ["term", "definition", "explanation"]
     }
   };
 
-  const response: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: schema,
-    },
-  }));
-
-  return JSON.parse(response.text.trim());
+  return requestAI(prompt, schema);
 };
 
 export const generateQuizQuestions = async (profile: UserProfile, weakTopics: string[] = [], focusTopics: string[] = [], count: number = 10): Promise<QuizQuestion[]> => {
@@ -93,17 +176,7 @@ export const generateQuizQuestions = async (profile: UserProfile, weakTopics: st
     }
   };
 
-  const response: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: schema,
-      temperature: 0.8,
-    },
-  }));
-
-  return JSON.parse(response.text.trim());
+  return requestAI(prompt, schema);
 };
 
 export const generateReview = async (incorrectAnswers: IncorrectAnswer[], profile: UserProfile): Promise<QuestionReview[]> => {
@@ -127,14 +200,5 @@ export const generateReview = async (incorrectAnswers: IncorrectAnswer[], profil
     }
   };
 
-  const response: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: schema,
-    },
-  }));
-
-  return JSON.parse(response.text.trim());
+  return requestAI(prompt, schema);
 };
