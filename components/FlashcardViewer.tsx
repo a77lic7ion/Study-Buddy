@@ -18,7 +18,7 @@ type CardCount = 10 | 25 | 40;
 const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBack, onTestComplete }) => {
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [loading, setLoading] = useState(false);
-  const [preSetup, setPreSetup] = useState(true);
+  const [status, setStatus] = useState<'setup' | 'active' | 'summary'>('setup');
   const [difficulty, setDifficulty] = useState<Difficulty>('Medium');
   const [cardCount, setCardCount] = useState<CardCount>(10);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -40,7 +40,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
         if (savedCards && savedCards.length > 0) {
           setCards(savedCards);
           setCurrentIndex(savedIndex || 0);
-          setPreSetup(false);
+          setStatus('active');
         }
       } catch (e) {
         console.error("Failed to load saved session", e);
@@ -49,14 +49,13 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
   }, [persistenceKey]);
 
   useEffect(() => {
-    if (!preSetup && !loading && cards.length > 0) {
+    if (status === 'active' && !loading && cards.length > 0) {
       localStorage.setItem(persistenceKey, JSON.stringify({ cards, index: currentIndex }));
     }
-  }, [currentIndex, cards, preSetup, loading, persistenceKey]);
+  }, [currentIndex, cards, status, loading, persistenceKey]);
 
   const startSession = async () => {
     setLoading(true);
-    setPreSetup(false);
     try {
       const aiCards = await generateFlashcards(profile, difficulty, cardCount);
       setCards(aiCards);
@@ -67,9 +66,10 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
       setCardsEvaluated(0);
       setSelectedOption(null);
       localStorage.setItem(persistenceKey, JSON.stringify({ cards: aiCards, index: 0 }));
+      setStatus('active');
     } catch (e) {
       console.error(e);
-      setPreSetup(true);
+      setStatus('setup');
     } finally {
       setLoading(false);
     }
@@ -91,7 +91,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
     if (currentIndex < cards.length - 1) {
       handleCardChange(currentIndex + 1);
     } else {
-      finalizeSession();
+      setStatus('summary');
     }
   };
 
@@ -99,12 +99,13 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
     if (currentIndex > 0) handleCardChange(currentIndex - 1);
   };
 
-  const finalizeSession = () => {
+  const commitData = () => {
     if (cardsEvaluated === 0) {
       onBack();
       return;
     }
     const finalScore = Math.round((testScore / cardsEvaluated) * 100);
+    // Fixed: Removed the second argument 'flashcard' as the interface only expects 'score: number'
     onTestComplete(finalScore);
     localStorage.removeItem(persistenceKey);
     onBack();
@@ -141,14 +142,14 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
     nextCard();
   };
 
-  if (preSetup) {
+  if (status === 'setup') {
     return (
       <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-10 animate-in zoom-in duration-300">
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 bg-secondary rounded-lg flex items-center justify-center mb-5 text-primary ring-1 ring-border shadow-sm">
             <span className="material-icons-round text-3xl">psychology</span>
           </div>
-          <h2 className="text-2xl font-black uppercase italic italic">Neural Forge</h2>
+          <h2 className="text-2xl font-black uppercase italic">Neural Forge</h2>
           <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1">Calibrating difficulty for {profile.subject}</p>
         </div>
         
@@ -190,6 +191,35 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
       <p className="mt-8 font-black text-primary animate-pulse tracking-widest text-[10px] uppercase">Synthesizing Learning Assets...</p>
     </div>
   );
+
+  if (status === 'summary') {
+    const finalScore = cardsEvaluated > 0 ? Math.round((testScore / cardsEvaluated) * 100) : 0;
+    return (
+      <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-10 animate-in zoom-in duration-500 text-center">
+        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-8 text-primary border border-primary/20 shadow-xl">
+          <span className="material-icons-round text-5xl">task_alt</span>
+        </div>
+        <h2 className="text-3xl font-black uppercase italic italic mb-2">Cycle Complete</h2>
+        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mb-10">Neural artifacts successfully reviewed</p>
+        
+        <div className="grid grid-cols-2 gap-4 mb-10">
+          <div className="p-4 bg-secondary/30 rounded-xl border border-border">
+            <span className="text-[9px] font-black uppercase text-muted-foreground block mb-2">Retention Score</span>
+            <span className="text-3xl font-black text-primary">{finalScore}%</span>
+          </div>
+          <div className="p-4 bg-secondary/30 rounded-xl border border-border">
+            <span className="text-[9px] font-black uppercase text-muted-foreground block mb-2">Cards Analyzed</span>
+            <span className="text-3xl font-black text-foreground">{cardsEvaluated}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <Button onClick={commitData} size="lg" className="w-full text-[10px] uppercase tracking-widest bg-green-600 hover:bg-green-700">SAVE DATA & RETURN</Button>
+          <Button onClick={onBack} variant="ghost" className="w-full text-[10px] uppercase tracking-widest text-destructive">EXIT WITHOUT SAVING</Button>
+        </div>
+      </div>
+    );
+  }
 
   const currentCard = cards[currentIndex];
   const isMultipleChoice = currentCard?.options && currentCard.options.length > 0;
@@ -293,8 +323,8 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Button onClick={finalizeSession} variant="ghost" className="text-[9px] uppercase tracking-widest border-border text-destructive hover:bg-destructive/10">END & SAVE SESSION</Button>
-          <Button onClick={() => setPreSetup(true)} variant="ghost" className="text-[9px] uppercase tracking-widest border-border">NEW BATCH</Button>
+          <Button onClick={() => setStatus('summary')} variant="ghost" className="text-[9px] uppercase tracking-widest border-border text-destructive hover:bg-destructive/10">END SESSION</Button>
+          <Button onClick={() => setStatus('setup')} variant="ghost" className="text-[9px] uppercase tracking-widest border-border">NEW BATCH</Button>
           {isTestMode ? (
             <Button onClick={() => setIsTestMode(false)} variant="secondary" className="text-[9px] uppercase tracking-widest border-border">PRACTICE MODE</Button>
           ) : (

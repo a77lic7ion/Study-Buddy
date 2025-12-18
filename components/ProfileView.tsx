@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { User, TestResult } from '../types';
 import Button from './Button';
 import ProgressGraph from './ProgressGraph';
@@ -14,20 +14,31 @@ interface ProfileViewProps {
 const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdateUser, onOpenReportCard }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Group scores by subject for the "Subject Mastery" overview
-  const subjectStats = scores.reduce((acc: any, curr) => {
+  const subjectStats = useMemo(() => scores.reduce((acc: any, curr) => {
     if (!acc[curr.subject]) acc[curr.subject] = { total: 0, count: 0, best: 0 };
     acc[curr.subject].total += curr.score;
     acc[curr.subject].count += 1;
     acc[curr.subject].best = Math.max(acc[curr.subject].best, curr.score);
     return acc;
-  }, {});
+  }, {}), [scores]);
 
   const currentSubject = user.profile?.subject || 'None';
   
-  // Gaps are subject-specific
-  const weakKey = `weakTopics_${user.id}_${user.profile?.grade}_${currentSubject}`;
-  const weakTopics = JSON.parse(localStorage.getItem(weakKey) || '[]');
+  // Gaps analysis: Count frequency of weak topics
+  const gapAnalysis = useMemo(() => {
+    const weakKey = `weakTopics_${user.id}_${user.profile?.grade}_${currentSubject}`;
+    const rawWeakTopics: string[] = JSON.parse(localStorage.getItem(weakKey) || '[]');
+    
+    const counts: Record<string, number> = {};
+    rawWeakTopics.forEach(topic => {
+      counts[topic] = (counts[topic] || 0) + 1;
+    });
+
+    return Object.entries(counts)
+      .map(([topic, count]) => ({ topic, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5); // Show top 5 gaps
+  }, [user.id, user.profile?.grade, currentSubject]);
 
   const avgScore = scores.length > 0 
     ? Math.round(scores.reduce((a, b) => a + b.score, 0) / scores.length) 
@@ -57,6 +68,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdat
     fileInputRef.current?.click();
   };
 
+  const maxGapCount = gapAnalysis.length > 0 ? Math.max(...gapAnalysis.map(g => g.count)) : 1;
+
   return (
     <div className="w-full max-w-6xl mx-auto px-4 py-8 animate-in fade-in duration-700 print:bg-white print:text-black">
       <style>{`
@@ -79,157 +92,191 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdat
       <div className="print-area space-y-8">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
             <div 
               onClick={triggerImageUpload}
-              className="relative w-16 h-16 rounded-xl bg-secondary border border-border flex items-center justify-center overflow-hidden cursor-pointer group shadow-lg"
+              className="relative w-20 h-20 rounded-2xl bg-secondary border border-border flex items-center justify-center overflow-hidden cursor-pointer group shadow-2xl ring-1 ring-primary/20"
             >
               {user.profileImage ? (
                 <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                <img src="/logo.png" alt="NeuroForge" className="w-10 h-10 object-contain opacity-50 group-hover:opacity-100 transition-opacity" />
+                <div className="flex flex-col items-center opacity-30 group-hover:opacity-100 transition-opacity">
+                   <span className="material-icons-round text-3xl">account_circle</span>
+                   <span className="text-[8px] font-black uppercase tracking-tighter mt-1">Upload</span>
+                </div>
               )}
               <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                 <span className="material-icons-round text-white text-sm">edit</span>
+                 <span className="material-icons-round text-white">camera_alt</span>
               </div>
             </div>
             <div>
-              <h2 className="text-3xl font-black text-foreground uppercase italic tracking-tighter">
+              <h2 className="text-4xl font-black text-foreground uppercase italic tracking-tighter leading-none">
                 NEURAL<span className="text-primary">FORGE</span>
               </h2>
-              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.2em]">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mt-2 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                 UNIFIED SCHOLAR PROFILE: {user.email.toUpperCase()}
               </p>
             </div>
           </div>
           
-          <div className="flex gap-2 no-print">
-            <Button onClick={onOpenReportCard} variant="primary" size="sm" className="bg-primary/20 hover:bg-primary/30 text-primary border-primary/20 px-6 py-2 rounded-lg text-[10px] tracking-widest uppercase">
-              <span className="material-icons-round text-sm mr-2">history_edu</span>
+          <div className="flex gap-3 no-print">
+            <Button onClick={onOpenReportCard} variant="primary" size="sm" className="bg-primary/20 hover:bg-primary/30 text-primary border-primary/20 px-8 py-3 rounded-xl text-[10px] tracking-[0.2em] font-black uppercase italic">
               Full Transcript
             </Button>
-            <Button onClick={handlePrint} variant="ghost" size="sm" className="bg-secondary border-border px-6 py-2 rounded-lg text-[10px] tracking-widest uppercase">
-              <span className="material-icons-round text-sm mr-2">picture_as_pdf</span>
+            <Button onClick={handlePrint} variant="ghost" size="sm" className="bg-secondary/50 border-border px-8 py-3 rounded-xl text-[10px] tracking-[0.2em] font-black uppercase">
               Export PDF
             </Button>
-            <Button onClick={onBack} variant="ghost" size="sm" className="bg-secondary border-border px-6 py-2 rounded-lg text-[10px] tracking-widest uppercase">
+            <Button onClick={onBack} variant="ghost" size="sm" className="bg-secondary/50 border-border px-8 py-3 rounded-xl text-[10px] tracking-[0.2em] font-black uppercase">
               Return
             </Button>
           </div>
         </div>
 
         {/* Top Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-card/30 backdrop-blur-sm border border-border p-8 rounded-2xl text-center shadow-xl flex flex-col items-center justify-center">
-            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mb-4">Lifetime Assessments</span>
-            <span className="text-6xl font-black text-primary drop-shadow-[0_0_15px_rgba(79,70,229,0.3)]">{scores.length}</span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-card/40 backdrop-blur-xl border border-white/5 p-10 rounded-[2rem] text-center shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><span className="material-icons-round text-6xl">analytics</span></div>
+            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] mb-4 block">Lifetime Assessments</span>
+            <span className="text-7xl font-black text-primary drop-shadow-[0_0_20px_rgba(79,70,229,0.4)]">{scores.length}</span>
           </div>
-          <div className="bg-card/30 backdrop-blur-sm border border-border p-8 rounded-2xl text-center shadow-xl flex flex-col items-center justify-center">
-            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mb-4">Global Mastery Avg</span>
-            <span className="text-6xl font-black text-primary/80 drop-shadow-[0_0_15px_rgba(79,70,229,0.2)]">{avgScore}%</span>
+          <div className="bg-card/40 backdrop-blur-xl border border-white/5 p-10 rounded-[2rem] text-center shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><span className="material-icons-round text-6xl">emoji_events</span></div>
+            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] mb-4 block">Global Mastery Avg</span>
+            <span className="text-7xl font-black text-primary drop-shadow-[0_0_20px_rgba(79,70,229,0.4)]">{avgScore}%</span>
           </div>
-          <div className="bg-card/30 backdrop-blur-sm border border-border p-8 rounded-2xl text-center shadow-xl flex flex-col items-center justify-center">
-            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mb-4">Current Target</span>
-            <span className="text-4xl font-black text-foreground truncate max-w-full">{currentSubject}</span>
+          <div className="bg-card/40 backdrop-blur-xl border border-white/5 p-10 rounded-[2rem] text-center shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><span className="material-icons-round text-6xl">target</span></div>
+            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] mb-4 block">Current Target</span>
+            <span className="text-4xl font-black text-foreground italic uppercase tracking-tighter truncate max-w-full">{currentSubject}</span>
           </div>
         </div>
 
-        {/* Mid Section: Proficiency & Growth */}
+        {/* Mid Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-6">
-            <div className="bg-card/20 backdrop-blur-sm p-8 rounded-2xl border border-border shadow-xl h-full">
-               <h3 className="text-xs font-black uppercase text-primary mb-8 flex items-center gap-2 tracking-[0.3em]">
-                 <span className="material-icons-round text-sm">stars</span>
+            {/* Module Proficiency List */}
+            <div className="bg-card/30 backdrop-blur-xl p-10 rounded-[2rem] border border-white/5 shadow-2xl">
+               <h3 className="text-[11px] font-black uppercase text-primary mb-10 flex items-center gap-3 tracking-[0.4em]">
+                 <span className="material-icons-round text-lg">star_outline</span>
                  Module Proficiency
                </h3>
-               <div className="space-y-4">
+               <div className="space-y-6">
                  {Object.keys(subjectStats).length > 0 ? Object.keys(subjectStats).map(s => {
                    const stats = subjectStats[s];
                    const avg = Math.round(stats.total / stats.count);
                    return (
-                     <div key={s} className="bg-secondary/20 p-6 rounded-xl border border-border/50 flex items-center justify-between group hover:bg-secondary/40 transition-all">
+                     <div key={s} className="bg-secondary/10 p-6 rounded-2xl border border-white/5 flex items-center justify-between group hover:bg-primary/5 transition-all cursor-default">
                         <div className="flex flex-col">
-                          <span className="text-sm font-black uppercase italic">{s}</span>
-                          <span className="text-[8px] text-muted-foreground font-bold uppercase tracking-widest">{stats.count} Attempts</span>
+                          <span className="text-base font-black uppercase italic tracking-tight">{s}</span>
+                          <span className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em] mt-1">{stats.count} RECALL CYCLES</span>
                         </div>
-                        <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-8">
                            <div className="text-right">
-                              <span className="block text-[8px] text-muted-foreground uppercase font-black tracking-widest mb-1">Avg</span>
-                              <span className={`text-base font-black ${avg >= 80 ? 'text-green-500' : 'text-foreground'}`}>{avg}%</span>
+                              <span className="block text-[9px] text-muted-foreground uppercase font-black tracking-widest mb-1 opacity-50">AVG</span>
+                              <span className={`text-2xl font-black italic ${avg >= 80 ? 'text-green-500' : 'text-foreground'}`}>{avg}%</span>
                            </div>
-                           <div className="w-1 h-12 bg-border rounded-full overflow-hidden relative">
-                              <div className="absolute bottom-0 left-0 w-full bg-primary shadow-[0_0_8px_rgba(79,70,229,0.8)]" style={{ height: `${avg}%` }}></div>
+                           <div className="w-1.5 h-14 bg-white/5 rounded-full overflow-hidden relative">
+                              <div className="absolute bottom-0 left-0 w-full bg-primary shadow-[0_0_15px_rgba(79,70,229,0.9)] transition-all duration-1000" style={{ height: `${avg}%` }}></div>
                            </div>
                         </div>
                      </div>
                    );
                  }) : (
-                   <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest italic py-8 text-center opacity-30">Awaiting proficiency data...</p>
+                   <div className="py-12 text-center opacity-30 flex flex-col items-center">
+                     <span className="material-icons-round text-4xl mb-4">folder_off</span>
+                     <p className="text-[10px] font-black uppercase tracking-[0.3em] italic">No neural artifacts generated yet.</p>
+                   </div>
                  )}
                </div>
             </div>
 
-            <div className="bg-card/20 backdrop-blur-sm p-8 rounded-2xl border border-border shadow-xl">
-               <h3 className="text-xs font-black uppercase text-destructive mb-6 flex items-center gap-2 tracking-[0.3em]">
-                 <span className="material-icons-round text-sm">insights</span>
-                 Targeted Learning Gaps: {currentSubject}
+            {/* Targeted Learning Gaps Visualization */}
+            <div className="bg-card/30 backdrop-blur-xl p-10 rounded-[2rem] border border-white/5 shadow-2xl relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-8 opacity-5"><span className="material-icons-round text-7xl text-destructive">error_outline</span></div>
+               <h3 className="text-[11px] font-black uppercase text-destructive mb-10 flex items-center gap-3 tracking-[0.4em]">
+                 <span className="material-icons-round text-lg">dangerous</span>
+                 Neural Gap Analysis: {currentSubject}
                </h3>
-               <div className="flex flex-wrap gap-2 mb-6">
-                 {weakTopics.length > 0 ? weakTopics.map((t: string) => (
-                   <span key={t} className="px-4 py-2 bg-destructive/5 text-destructive border border-destructive/20 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm">
-                     {t}
-                   </span>
-                 )) : <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest italic opacity-40">No critical gaps identified for active module.</p>}
+               
+               <div className="space-y-6">
+                 {gapAnalysis.length > 0 ? gapAnalysis.map((gap, i) => (
+                   <div key={gap.topic} className="space-y-3">
+                     <div className="flex justify-between items-end">
+                       <span className="text-[10px] font-black uppercase tracking-widest text-foreground/80">{gap.topic}</span>
+                       <span className="text-[9px] font-bold text-destructive uppercase tracking-widest">{gap.count} FAILURES DETECTED</span>
+                     </div>
+                     <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-destructive shadow-[0_0_15px_rgba(239,68,68,0.5)] transition-all duration-1000" 
+                          style={{ 
+                            width: `${(gap.count / maxGapCount) * 100}%`,
+                            animationDelay: `${i * 100}ms`
+                          }}
+                        ></div>
+                     </div>
+                   </div>
+                 )) : (
+                   <div className="py-10 bg-green-500/5 border border-green-500/10 rounded-2xl p-8 text-center flex flex-col items-center">
+                      <span className="material-icons-round text-green-500 text-3xl mb-4 animate-bounce">verified</span>
+                      <p className="text-[11px] font-black uppercase tracking-[0.2em] text-green-500 leading-relaxed">
+                        No critical learning gaps identified in current module.<br/>
+                        Neural integrity confirmed for active target.
+                      </p>
+                   </div>
+                 )}
                </div>
-               <p className="text-[8px] text-muted-foreground font-medium leading-relaxed uppercase tracking-wider opacity-60">
-                 Gaps are recalculated after every assessment to ensure precision tracking for the active subject. 
-                 Mastery of these items is required for module certification.
-               </p>
+
+               <div className="mt-10 p-5 bg-secondary/20 rounded-2xl border border-white/5">
+                 <p className="text-[9px] text-muted-foreground font-bold leading-relaxed uppercase tracking-wider opacity-60 italic">
+                   Gaps represent repetitive conceptual failures. High frequency items are automatically prioritized in the next Recall Cycle.
+                 </p>
+               </div>
             </div>
           </div>
 
-          <div className="bg-card/20 backdrop-blur-sm p-8 rounded-2xl border border-border shadow-xl flex flex-col h-full">
+          <div className="bg-card/30 backdrop-blur-xl p-10 rounded-[2rem] border border-white/5 shadow-2xl flex flex-col min-h-[600px]">
              <ProgressGraph scores={scores.slice(-10)} />
           </div>
         </div>
 
-        {/* Bottom Section: History Log */}
-        <div className="bg-card/20 backdrop-blur-sm p-10 rounded-2xl border border-border shadow-2xl">
-          <h3 className="text-sm font-black uppercase mb-8 text-foreground tracking-[0.3em] flex items-center gap-2">
-            <span className="material-icons-round text-sm text-primary">analytics</span>
-            Evaluation History Log
+        {/* Evaluation History Log */}
+        <div className="bg-card/30 backdrop-blur-xl p-12 rounded-[2rem] border border-white/5 shadow-2xl">
+          <h3 className="text-[11px] font-black uppercase mb-10 text-foreground tracking-[0.4em] flex items-center gap-3">
+            <span className="material-icons-round text-lg text-primary">data_usage</span>
+            Central Evaluation History
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.3em] border-b border-border/50">
-                  <th className="pb-6 px-4">Timestamp</th>
-                  <th className="pb-6 px-4">Learning Module</th>
-                  <th className="pb-6 px-4">Format</th>
-                  <th className="pb-6 px-4 text-right">Efficiency Score</th>
+                <tr className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.4em] border-b border-white/5">
+                  <th className="pb-8 px-6">Timestamp</th>
+                  <th className="pb-8 px-6">Module Type</th>
+                  <th className="pb-8 px-6">Format</th>
+                  <th className="pb-8 px-6 text-right">Recall Efficiency</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/20">
+              <tbody className="divide-y divide-white/5">
                 {scores.slice().reverse().map((s, i) => (
-                  <tr key={i} className={`group hover:bg-primary/5 transition-all ${s.subject === currentSubject ? 'bg-primary/5' : ''}`}>
-                    <td className="py-6 px-4">
-                      <span className="text-[10px] font-bold text-muted-foreground font-mono">
-                        {new Date(s.date).toLocaleDateString()}
+                  <tr key={i} className={`group hover:bg-primary/10 transition-all ${s.subject === currentSubject ? 'bg-primary/5' : ''}`}>
+                    <td className="py-8 px-6">
+                      <span className="text-[11px] font-black text-muted-foreground font-mono opacity-80">
+                        {new Date(s.date).toLocaleString()}
                       </span>
                     </td>
-                    <td className="py-6 px-4">
+                    <td className="py-8 px-6">
                       <div className="flex flex-col">
-                        <span className="text-sm font-black italic uppercase group-hover:text-primary transition-colors">{s.subject}</span>
-                        <span className="text-[8px] text-muted-foreground font-black uppercase tracking-widest mt-1 opacity-50">{s.grade}</span>
+                        <span className="text-base font-black italic uppercase group-hover:text-primary transition-colors tracking-tight">{s.subject}</span>
+                        <span className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em] mt-1.5 opacity-40">{s.grade} SYNTHESIS</span>
                       </div>
                     </td>
-                    <td className="py-6 px-4">
-                      <span className={`px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border ${s.type === 'quiz' ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-secondary border-border text-muted-foreground'}`}>
+                    <td className="py-8 px-6">
+                      <span className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-[0.2em] border shadow-sm ${s.type === 'quiz' ? 'bg-primary/20 border-primary/30 text-primary' : 'bg-secondary/50 border-white/10 text-muted-foreground'}`}>
                         {s.type}
                       </span>
                     </td>
-                    <td className="py-6 px-4 text-right">
-                      <span className={`text-lg font-black italic ${s.score >= 80 ? 'text-green-500' : s.score >= 50 ? 'text-amber-500' : 'text-destructive'} drop-shadow-sm`}>
+                    <td className="py-8 px-6 text-right">
+                      <span className={`text-3xl font-black italic ${s.score >= 80 ? 'text-green-500' : s.score >= 50 ? 'text-amber-500' : 'text-destructive'} drop-shadow-xl`}>
                         {s.score}%
                       </span>
                     </td>
@@ -237,8 +284,11 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdat
                 ))}
                 {scores.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-16 text-center text-muted-foreground text-[10px] font-black uppercase tracking-[0.4em] opacity-20">
-                      No neural data records identified.
+                    <td colSpan={4} className="py-24 text-center">
+                       <div className="flex flex-col items-center opacity-10">
+                         <span className="material-icons-round text-6xl mb-4">cloud_off</span>
+                         <p className="text-[12px] font-black uppercase tracking-[0.5em]">No neural records detected.</p>
+                       </div>
                     </td>
                   </tr>
                 )}

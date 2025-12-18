@@ -24,7 +24,6 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
   const [incorrect, setIncorrect] = useState<IncorrectAnswer[]>([]);
   const [reviews, setReviews] = useState<QuestionReview[]>([]);
   const [focusTopics, setFocusTopics] = useState("");
-  const [hasSavedSession, setHasSavedSession] = useState(false);
   const [weakTopics, setWeakTopics] = useState<string[]>([]);
 
   const sessionKey = `quiz_session_${userId}_${profile.grade}_${profile.subject}`;
@@ -32,7 +31,6 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
 
   useEffect(() => {
     const saved = localStorage.getItem(sessionKey);
-    setHasSavedSession(!!saved);
     const storedWeak = localStorage.getItem(weakKey);
     if (storedWeak) {
       try {
@@ -108,27 +106,37 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
       return;
     }
     const finalScore = Math.round((score / totalAnswered) * 100);
-    onTestComplete(finalScore);
-    localStorage.removeItem(sessionKey);
-
+    
+    // Save metadata
     const newlyWeak = incorrect.map(i => i.question.topic);
     const combined = Array.from(new Set([...weakTopics, ...newlyWeak])).slice(-20);
     localStorage.setItem(weakKey, JSON.stringify(combined));
 
-    if (incorrect.length > 0) {
-      setStatus('loading');
-      try {
+    setStatus('loading');
+    try {
+      if (incorrect.length > 0) {
         const feedback = await generateReview(incorrect, profile);
         setReviews(feedback);
-      } catch (e) {}
+      }
+    } catch (e) {
+      console.error("Failed to generate AI feedback", e);
     }
     setStatus('review');
+  };
+
+  const commitData = () => {
+    const totalAnswered = currentIndex + (selected ? 1 : 0);
+    const finalScore = Math.round((score / totalAnswered) * 100);
+    // Fixed: Removed the second argument 'quiz' as the interface only expects 'score: number'
+    onTestComplete(finalScore);
+    localStorage.removeItem(sessionKey);
+    onBack();
   };
 
   if (status === 'loading') return (
     <div className="flex flex-col items-center">
       <LoadingSpinner />
-      <p className="mt-8 font-black text-primary animate-pulse tracking-widest text-[10px] uppercase">Synthesizing Learning Module...</p>
+      <p className="mt-8 font-black text-primary animate-pulse tracking-widest text-[10px] uppercase">Processing Session Artifacts...</p>
     </div>
   );
 
@@ -138,7 +146,7 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
         <div className="w-16 h-16 bg-secondary rounded-lg flex items-center justify-center mb-5 text-primary ring-1 ring-border shadow-sm">
           <span className="material-icons-round text-3xl">bolt</span>
         </div>
-        <h2 className="text-2xl font-black uppercase italic italic">Simulation Hub</h2>
+        <h2 className="text-2xl font-black uppercase italic">Simulation Hub</h2>
         <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1">Target: {profile.subject}</p>
       </div>
       
@@ -160,80 +168,106 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
         </div>
 
         <div className="flex flex-col gap-3 pt-4">
-          <Button onClick={start} size="lg" className="w-full text-[10px] uppercase tracking-widest uppercase">INITIALIZE SIMULATION</Button>
-          <Button onClick={onBack} variant="ghost" className="w-full text-[10px] uppercase tracking-widest uppercase">ABORT</Button>
+          <Button onClick={start} size="lg" className="w-full text-[10px] uppercase tracking-widest">INITIALIZE SIMULATION</Button>
+          <Button onClick={onBack} variant="ghost" className="w-full text-[10px] uppercase tracking-widest">ABORT</Button>
         </div>
       </div>
     </div>
   );
 
   if (status === 'review') return (
-    <div className="w-full max-w-2xl space-y-8 animate-in fade-in duration-500">
+    <div className="w-full max-w-2xl space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="bg-card border border-border p-12 rounded-2xl shadow-2xl relative overflow-hidden text-center">
         <div className="absolute top-0 left-0 w-full h-1.5 bg-primary"></div>
+        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] mb-4 block">Simulation Complete</span>
         <span className="text-6xl md:text-8xl font-black text-primary drop-shadow-sm">{Math.round((score/questions.length)*100)}%</span>
-        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.4em] mt-6 italic">Simulation Efficiency Scored</p>
+        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mt-6 italic">Mastery achieved across {questions.length} cycles</p>
       </div>
-      <div className="space-y-4">
-        {reviews.map((r, i) => (
-          <div key={i} className="bg-card border border-border p-8 rounded-2xl shadow-lg">
-            <h4 className="font-bold text-foreground mb-6 leading-tight italic">{r.question}</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-               <div className="bg-destructive/5 p-4 rounded-xl border border-destructive/10"><span className="text-[9px] font-black uppercase text-destructive mb-2 block tracking-widest">Input</span><p className="text-xs font-bold opacity-70">{r.userAnswer}</p></div>
-               <div className="bg-green-500/5 p-4 rounded-xl border border-green-500/10"><span className="text-[9px] font-black uppercase text-green-500 mb-2 block tracking-widest">Target</span><p className="text-xs font-bold">{r.correctAnswer}</p></div>
+
+      {reviews.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-xs font-black uppercase tracking-[0.3em] px-2 text-primary">Neural Gaps Analysis</h3>
+          {reviews.map((r, i) => (
+            <div key={i} className="bg-card border border-border p-8 rounded-2xl shadow-lg animate-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${i * 100}ms` }}>
+              <h4 className="font-bold text-foreground mb-6 leading-tight italic">{r.question}</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div className="bg-destructive/5 p-4 rounded-xl border border-destructive/10"><span className="text-[9px] font-black uppercase text-destructive mb-2 block tracking-widest">Your Input</span><p className="text-xs font-bold opacity-70">{r.userAnswer}</p></div>
+                <div className="bg-green-500/5 p-4 rounded-xl border border-green-500/10"><span className="text-[9px] font-black uppercase text-green-500 mb-2 block tracking-widest">Target Answer</span><p className="text-xs font-bold">{r.correctAnswer}</p></div>
+              </div>
+              <div className="bg-secondary p-5 rounded-xl text-xs leading-relaxed text-muted-foreground italic border-l-4 border-primary shadow-inner">
+                <span className="text-[9px] font-black text-primary uppercase block mb-2 not-italic tracking-widest">Expert Briefing</span>
+                {r.explanation}
+              </div>
             </div>
-            <div className="bg-secondary p-5 rounded-xl text-xs leading-relaxed text-muted-foreground italic border-l-4 border-primary shadow-inner">
-              <span className="text-[9px] font-black text-primary uppercase block mb-2 not-italic tracking-widest">Expert Briefing</span>
-              {r.explanation}
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3">
+        <Button onClick={commitData} size="lg" className="w-full text-[10px] uppercase tracking-widest bg-green-600 hover:bg-green-700 shadow-lg">SAVE DATA & RETURN HOME</Button>
+        <Button onClick={onBack} variant="ghost" className="w-full text-[10px] uppercase tracking-widest text-destructive">EXIT WITHOUT SAVING</Button>
       </div>
-      <Button onClick={onBack} size="lg" className="w-full text-[10px] uppercase tracking-widest">CLOSE MISSION DATA</Button>
     </div>
   );
 
   const q = questions[currentIndex];
+  const progress = ((currentIndex + 1) / questions.length) * 100;
+
   return (
-    <div className="w-full max-w-2xl bg-card border border-border rounded-2xl shadow-2xl p-8 relative overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
-      <div className="flex items-center justify-between mb-10">
-        <div className="flex flex-col">
-          <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-1">{profile.subject}</span>
-          <span className="text-xl font-black">{currentIndex+1} <span className="text-muted-foreground text-sm font-normal">/ {questions.length}</span></span>
+    <div className="w-full flex flex-col items-center">
+      {/* Persistent Progress Bar at top of screen */}
+      <div className="fixed top-0 left-0 w-full h-1.5 bg-secondary z-[60]">
+        <div 
+          className="h-full bg-primary shadow-[0_0_15px_rgba(79,70,229,0.8)] transition-all duration-500 ease-out"
+          style={{ width: `${progress}%` }}
+        ></div>
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-card border border-border px-4 py-1.5 rounded-full shadow-lg">
+           <span className="text-[10px] font-black uppercase tracking-[0.3em] text-foreground">
+             Question {currentIndex + 1} <span className="text-muted-foreground">/ {questions.length}</span>
+           </span>
         </div>
-        <div className="flex-grow max-w-[200px] h-1.5 bg-secondary rounded-full mx-8 relative overflow-hidden">
-          <div className="bg-primary h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(99,102,241,0.5)]" style={{width: `${((currentIndex+1)/questions.length)*100}%`}}></div>
-        </div>
-        <button onClick={finalizeQuiz} className="text-[9px] font-black uppercase tracking-widest text-destructive hover:opacity-70 transition-opacity">TERMINATE & SCORE</button>
       </div>
-      <div className="mb-6 flex items-center gap-2"><span className="material-icons-round text-primary text-xs">label</span><span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">{q.topic}</span></div>
-      <h3 className="text-xl md:text-2xl font-black mb-10 leading-tight italic">{q.question}</h3>
-      <div className="grid grid-cols-1 gap-3 mb-10">
-        {q.options.map(opt => {
-          const isSelected = selected === opt;
-          const isCorrect = opt === q.correctAnswer;
-          let style = 'bg-background border-border hover:border-primary/50 text-muted-foreground';
-          if (selected) {
-            if (isCorrect) style = 'bg-green-600 border-green-600 text-white shadow-lg shadow-green-500/20';
-            else if (isSelected) style = 'bg-destructive border-destructive text-white';
-            else style = 'bg-background border-border opacity-30';
-          }
-          return (
-            <button key={opt} onClick={() => handleAnswer(opt)} disabled={!!selected} className={`p-5 rounded-xl border text-left transition-all duration-300 font-bold group flex items-center justify-between ${style}`}>
-              <span className="text-sm font-bold uppercase tracking-wide">{opt}</span>
-              {selected && isCorrect && <span className="material-icons-round text-sm">check_circle</span>}
-              {selected && isSelected && !isCorrect && <span className="material-icons-round text-sm">cancel</span>}
-            </button>
-          );
-        })}
-      </div>
-      {selected && (
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <Button onClick={next} size="lg" className="w-full text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20">
-            {currentIndex === questions.length - 1 ? 'End Simulation' : 'Next Transmission'}
-          </Button>
+
+      <div className="w-full max-w-2xl bg-card border border-border rounded-2xl shadow-2xl p-8 mt-16 relative overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+        <div className="flex items-center justify-between mb-10">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-1">{profile.subject}</span>
+            <span className="text-xl font-black">Active Phase</span>
+          </div>
+          <button onClick={finalizeQuiz} className="text-[9px] font-black uppercase tracking-widest text-destructive hover:opacity-70 transition-opacity flex items-center gap-2">
+            <span className="material-icons-round text-sm">cancel</span>
+            Terminate & Score
+          </button>
         </div>
-      )}
+        <div className="mb-6 flex items-center gap-2"><span className="material-icons-round text-primary text-xs">label</span><span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">{q.topic}</span></div>
+        <h3 className="text-xl md:text-2xl font-black mb-10 leading-tight italic">{q.question}</h3>
+        <div className="grid grid-cols-1 gap-3 mb-10">
+          {q.options.map(opt => {
+            const isSelected = selected === opt;
+            const isCorrect = opt === q.correctAnswer;
+            let style = 'bg-background border-border hover:border-primary/50 text-muted-foreground';
+            if (selected) {
+              if (isCorrect) style = 'bg-green-600 border-green-600 text-white shadow-lg shadow-green-500/20';
+              else if (isSelected) style = 'bg-destructive border-destructive text-white';
+              else style = 'bg-background border-border opacity-30';
+            }
+            return (
+              <button key={opt} onClick={() => handleAnswer(opt)} disabled={!!selected} className={`p-5 rounded-xl border text-left transition-all duration-300 font-bold group flex items-center justify-between ${style}`}>
+                <span className="text-sm font-bold uppercase tracking-wide">{opt}</span>
+                {selected && isCorrect && <span className="material-icons-round text-sm">check_circle</span>}
+                {selected && isSelected && !isCorrect && <span className="material-icons-round text-sm">cancel</span>}
+              </button>
+            );
+          })}
+        </div>
+        {selected && (
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <Button onClick={next} size="lg" className="w-full text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20">
+              {currentIndex === questions.length - 1 ? 'End Simulation' : 'Next Transmission'}
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
