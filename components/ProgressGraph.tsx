@@ -11,33 +11,36 @@ const ProgressGraph: React.FC<ProgressGraphProps> = ({ scores }) => {
     : 0;
 
   return (
-    <div className="w-full bg-card p-8 rounded-lg shadow-2xl border border-border relative overflow-hidden">
-      <div className="absolute top-0 right-0 p-4 opacity-5">
-         <span className="material-icons-round text-7xl">trending_up</span>
+    <div className="w-full h-full flex flex-col relative overflow-hidden">
+      <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+         <span className="material-icons-round text-8xl">trending_up</span>
       </div>
       
-      <div className="flex justify-between items-start mb-10">
-        <h2 className="text-sm font-black text-primary uppercase tracking-[0.3em] flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+      <div className="flex justify-between items-start mb-12">
+        <h2 className="text-[10px] font-black text-primary uppercase tracking-[0.4em] flex items-center gap-3">
+          <span className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(79,70,229,0.8)]"></span>
           Neural Growth Data
         </h2>
         
         {scores.length > 0 && (
           <div className="flex flex-col items-end">
-            <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Subject Mastery Avg</span>
-            <span className="text-xl font-black text-foreground">{average}%</span>
+            <span className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.3em] mb-1">Subject Mastery Avg</span>
+            <div className="flex items-center gap-3">
+              <span className="text-4xl font-black text-foreground drop-shadow-lg">{average}%</span>
+              <span className="material-icons-round text-primary text-2xl animate-bounce">north_east</span>
+            </div>
           </div>
         )}
       </div>
       
-      <div className="flex items-end justify-between gap-3 h-48 px-2 border-b border-border mb-6 relative">
+      <div className="flex-grow flex items-end justify-between gap-4 h-64 px-2 border-b border-border/50 mb-8 relative">
         {/* Average Line */}
         {scores.length > 1 && (
           <div 
-            className="absolute left-0 right-0 border-t border-dashed border-primary/30 z-0 transition-all duration-1000"
+            className="absolute left-0 right-0 border-t border-dashed border-primary/40 z-0 transition-all duration-1000 flex justify-end"
             style={{ bottom: `${average}%` }}
           >
-            <span className="absolute -top-4 right-0 text-[8px] font-bold text-primary/60 uppercase tracking-widest">AVG</span>
+            <span className="bg-background/80 backdrop-blur-sm px-2 text-[8px] font-black text-primary uppercase tracking-widest -mt-2.5">AVG Threshold</span>
           </div>
         )}
 
@@ -45,36 +48,38 @@ const ProgressGraph: React.FC<ProgressGraphProps> = ({ scores }) => {
           const date = new Date(result.date);
           const formattedDate = `${date.getDate()}/${date.getMonth() + 1}`;
           const isQuiz = result.type === 'quiz';
-          const barColor = isQuiz ? 'bg-primary' : 'bg-primary/40';
+          const barColor = isQuiz ? 'bg-primary' : 'bg-primary/30';
 
           return (
-            <div key={index} className="flex-1 flex flex-col items-center gap-2 group relative z-10">
+            <div key={index} className="flex-1 flex flex-col items-center gap-3 group relative z-10">
               <div 
-                className={`w-full rounded-t-sm transition-all duration-500 cursor-help relative ${barColor} hover:brightness-110 shadow-lg`} 
+                className={`w-full rounded-t-lg transition-all duration-700 cursor-help relative ${barColor} hover:brightness-125 shadow-[0_-4px_15px_rgba(79,70,229,0.1)] group-hover:shadow-[0_-4px_25px_rgba(79,70,229,0.3)]`} 
                 style={{ height: `${result.score}%` }}
               >
-                <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-foreground text-background px-2 py-1 rounded text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
-                  {result.score}% {isQuiz ? 'QUIZ' : 'FLSH'}
+                <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-foreground text-background px-3 py-1.5 rounded-lg text-[10px] font-black opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap z-20 shadow-xl translate-y-2 group-hover:translate-y-0">
+                  {result.score}% {isQuiz ? 'ADAPTIVE QUIZ' : 'RECALL SEQUENCE'}
                 </div>
               </div>
-              <span className="text-[9px] font-bold text-muted-foreground uppercase">{formattedDate}</span>
+              <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-60 group-hover:opacity-100 transition-opacity">
+                {formattedDate}
+              </span>
             </div>
           );
         }) : (
           <div className="w-full h-full flex items-center justify-center">
-            <p className="text-xs text-muted-foreground italic uppercase tracking-widest">Awaiting assessment data...</p>
+            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.5em] italic opacity-20">Awaiting Assessment Data Sync...</p>
           </div>
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-6">
-        <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_5px_rgba(99,102,241,0.5)]"></div>
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Adaptive Quiz</span>
+      <div className="flex flex-wrap items-center justify-center gap-8 bg-secondary/10 p-4 rounded-xl border border-border/30">
+        <div className="flex items-center gap-3">
+            <div className="w-3 h-3 rounded-full bg-primary shadow-[0_0_10px_rgba(79,70,229,0.6)]"></div>
+            <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Adaptive Quiz</span>
         </div>
-        <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-primary/40"></div>
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Recall Sequence</span>
+        <div className="flex items-center gap-3">
+            <div className="w-3 h-3 rounded-full bg-primary/30"></div>
+            <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Recall Sequence</span>
         </div>
       </div>
     </div>
