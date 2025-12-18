@@ -14,7 +14,6 @@ interface ProfileViewProps {
 const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdateUser, onOpenReportCard }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Logic to calculate strengths and weaknesses
   const subjectAverages = scores.reduce((acc: any, curr) => {
     if (!acc[curr.subject]) acc[curr.subject] = { total: 0, count: 0 };
     acc[curr.subject].total += curr.score;
@@ -25,7 +24,6 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdat
   const strengths = Object.keys(subjectAverages)
     .filter(subj => (subjectAverages[subj].total / subjectAverages[subj].count) >= 80);
 
-  // Get weak topics from local storage
   const weakKey = `weakTopics_${user.id}_${user.profile?.grade}_${user.profile?.subject}`;
   const weakTopics = JSON.parse(localStorage.getItem(weakKey) || '[]');
 
@@ -37,13 +35,30 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdat
     window.print();
   };
 
+  const clearAppData = () => {
+    if (confirm("Reset current storage? This will logout and clear all local results.")) {
+      localStorage.clear();
+      window.location.href = '/';
+    }
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // 500KB limit for profile images to prevent QuotaExceededError
+      if (file.size > 512000) {
+        alert("Image too large. Please select a file under 500KB.");
+        return;
+      }
+
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64String = reader.result as string;
-        onUpdateUser({ ...user, profileImage: base64String });
+        try {
+          onUpdateUser({ ...user, profileImage: base64String });
+        } catch (storageErr) {
+          alert("Storage limit reached. Profile image could not be saved.");
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -170,7 +185,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdat
           </div>
         </div>
 
-        <div className="bg-card p-8 rounded-2xl border border-border shadow-2xl print-bg-fix">
+        <div className="bg-card p-8 rounded-2xl border border-border shadow-2xl print-bg-fix mb-8">
           <h3 className="text-xl font-black uppercase mb-6 text-foreground print:text-black">Attempt History Log</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left print:text-black">
@@ -207,6 +222,16 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, scores, onBack, onUpdat
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div className="no-print bg-destructive/5 border border-destructive/20 rounded-xl p-6 flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="text-xs font-black uppercase text-destructive tracking-widest">Maintenance</span>
+            <span className="text-[10px] text-muted-foreground font-medium">Clear system cache to resolve storage issues.</span>
+          </div>
+          <Button onClick={clearAppData} variant="secondary" size="sm" className="text-destructive border-destructive/20 hover:bg-destructive/10 text-[10px] uppercase tracking-widest">
+            Wipe App Cache
+          </Button>
         </div>
         
         <div className="hidden print:block mt-12 pt-8 border-t border-border text-[10px] text-muted-foreground text-center uppercase tracking-widest">

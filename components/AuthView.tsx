@@ -13,6 +13,13 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const clearAllData = () => {
+    if (confirm("This will delete all accounts and scores stored in this browser. Continue?")) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -24,7 +31,6 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
       return;
     }
 
-    // Small delay to simulate processing and ensure state updates aren't racy
     await new Promise(res => setTimeout(res, 300));
 
     try {
@@ -34,7 +40,6 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
         try {
           users = JSON.parse(storedUsers);
         } catch (e) {
-          console.error("User database corrupted, initializing fresh list.");
           users = [];
         }
       }
@@ -57,13 +62,22 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
             password,
           };
           users.push(newUser);
-          localStorage.setItem('users', JSON.stringify(users));
-          onAuthComplete(newUser);
+          
+          try {
+            localStorage.setItem('users', JSON.stringify(users));
+            onAuthComplete(newUser);
+          } catch (storageError: any) {
+            if (storageError.name === 'QuotaExceededError' || storageError.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+              setError('Storage quota exceeded. Please clear browsing data.');
+            } else {
+              throw storageError;
+            }
+          }
         }
       }
     } catch (err) {
       console.error("Auth system failure:", err);
-      setError('System storage error. Check browser permissions.');
+      setError('System storage error. Storage might be full.');
     } finally {
       setLoading(false);
     }
@@ -101,9 +115,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between ml-1">
-            <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest">Password</label>
-          </div>
+          <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest ml-1">Password</label>
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <span className="material-icons-round text-muted-foreground text-lg group-focus-within:text-primary transition-colors">lock</span>
@@ -121,9 +133,16 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
         </div>
 
         {error && (
-          <div className="bg-destructive/10 border border-destructive/20 p-3 rounded-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
-             <span className="material-icons-round text-destructive text-sm">error</span>
-             <p className="text-destructive text-[10px] font-bold uppercase tracking-widest leading-none">{error}</p>
+          <div className="space-y-2">
+            <div className="bg-destructive/10 border border-destructive/20 p-3 rounded-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+               <span className="material-icons-round text-destructive text-sm">error</span>
+               <p className="text-destructive text-[10px] font-bold uppercase tracking-widest leading-none flex-grow">{error}</p>
+            </div>
+            {error.includes('Storage') && (
+              <Button onClick={clearAllData} type="button" variant="secondary" size="sm" className="w-full text-[9px] py-2 uppercase tracking-widest border-destructive/20 text-destructive hover:bg-destructive/10">
+                Wipe Local Data & Reset
+              </Button>
+            )}
           </div>
         )}
 
