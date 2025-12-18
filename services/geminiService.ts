@@ -17,12 +17,22 @@ const withRetry = async <T>(fn: () => Promise<T>, retries = 2, delay = 1000): Pr
 };
 
 export const generateFlashcards = async (profile: UserProfile, difficulty: string = 'Medium'): Promise<Flashcard[]> => {
+  let mcLogic = "";
+  if (difficulty === 'Easy') {
+    mcLogic = "Every single flashcard MUST include 4 multiple-choice 'options' (one of which is the correct 'definition').";
+  } else if (difficulty === 'Medium') {
+    mcLogic = "Approximately 50% of the flashcards MUST include 4 multiple-choice 'options' (one of which is the correct 'definition'). The rest should not have options.";
+  } else if (difficulty === 'Hard') {
+    mcLogic = "Only a few flashcards (about 2 or 3) should include multiple-choice 'options'. Most should rely on pure recall.";
+  }
+
   const prompt = `Generate a set of 15 high-quality educational flashcards for a student in ${profile.grade} studying ${profile.subject}. 
   DIFFICULTY LEVEL: ${difficulty}. 
+  ${mcLogic}
   The content should align with standard school curriculums. 
-  IMPORTANT: The "term" property should be a full, descriptive question (e.g., "What is an Adjective?" instead of just "Adjective"). 
-  Focus on key terms, definitions, and core concepts appropriate for the ${difficulty} level. 
-  Make the definitions clear and age-appropriate.`;
+  IMPORTANT: The "term" property should be a full, descriptive question.
+  For cards with "options", ensure the "definition" matches exactly one of the options.
+  Focus on key terms, definitions, and core concepts appropriate for the ${difficulty} level.`;
 
   const schema = {
     type: Type.ARRAY,
@@ -30,7 +40,12 @@ export const generateFlashcards = async (profile: UserProfile, difficulty: strin
       type: Type.OBJECT,
       properties: {
         term: { type: Type.STRING, description: "A descriptive question about the concept" },
-        definition: { type: Type.STRING, description: "The answer or definition" }
+        definition: { type: Type.STRING, description: "The answer or definition" },
+        options: { 
+          type: Type.ARRAY, 
+          items: { type: Type.STRING },
+          description: "4 distractors including the correct answer if this is a multiple-choice card"
+        }
       },
       required: ["term", "definition"]
     }

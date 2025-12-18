@@ -25,6 +25,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
   const [testScore, setTestScore] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
   const persistenceKey = `flashcard_session_${userId}_${profile.grade}_${profile.subject}`;
 
@@ -59,6 +60,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
       setCurrentIndex(0);
       setIsFlipped(false);
       setShowAnswer(false);
+      setSelectedOption(null);
       localStorage.setItem(persistenceKey, JSON.stringify({ cards: aiCards, index: 0 }));
     } catch (e) {
       console.error(e);
@@ -77,6 +79,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
       setCurrentIndex(newIndex);
       setIsFlipped(false);
       setShowAnswer(false);
+      setSelectedOption(null);
       
       // Allow a small delay for state to settle before showing new card
       setTimeout(() => {
@@ -111,6 +114,23 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
       onTestComplete(Math.round(((knewIt ? testScore + 1 : testScore) / cards.length) * 100));
       localStorage.removeItem(persistenceKey);
       onBack();
+    }
+  };
+
+  const handleMCOptionSelect = (opt: string) => {
+    if (selectedOption || !isTestMode) return;
+    setSelectedOption(opt);
+    const isCorrect = opt === cards[currentIndex].definition;
+    
+    // Show answer logic
+    setIsFlipped(true);
+    setShowAnswer(true);
+
+    if (isCorrect) {
+      playCorrectSound();
+      setTestScore(s => s + 1);
+    } else {
+      playIncorrectSound();
     }
   };
 
@@ -178,6 +198,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
   );
 
   const currentCard = cards[currentIndex];
+  const isMultipleChoice = currentCard?.options && currentCard.options.length > 0;
 
   return (
     <div className="w-full max-w-xl mx-auto flex flex-col items-center animate-in fade-in slide-in-from-bottom-6 duration-700">
@@ -185,7 +206,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
       <div className="w-full mb-8 flex items-center justify-between px-2">
         <div className="flex flex-col">
           <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-1">
-            {isTestMode ? "ACTIVE RECALL MODE" : "PRACTICE SESSION"}
+            {isTestMode ? (isMultipleChoice ? "MULTIPLE CHOICE MODE" : "ACTIVE RECALL MODE") : "PRACTICE SESSION"}
           </span>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>
@@ -199,13 +220,13 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
         </div>
       </div>
 
-      {/* Main Flashcard with Flip logic */}
+      {/* Main Flashcard Area */}
       <div className="w-full mb-10 group" style={{ perspective: '2000px' }}>
         <div 
           className={`relative w-full h-[22rem] transition-all duration-700 ease-out preserve-3d cursor-pointer 
             ${isFlipped ? '[transform:rotateY(180deg)]' : ''} 
             ${isTransitioning ? 'opacity-0 scale-95 -translate-y-4' : 'opacity-100 scale-100 translate-y-0'}`}
-          onClick={() => !isTransitioning && setIsFlipped(!isFlipped)}
+          onClick={() => !isTransitioning && !isMultipleChoice && setIsFlipped(!isFlipped)}
         >
           {/* Front: Question Side */}
           <div 
@@ -214,7 +235,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
             style={{ zIndex: isFlipped ? 0 : 1 }}
           >
              <div className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-secondary border border-border rounded-full shadow-sm">
-               <span className="text-[8px] font-black uppercase tracking-[0.3em] text-muted-foreground">QUESTION</span>
+               <span className="text-[8px] font-black uppercase tracking-[0.3em] text-muted-foreground">{isMultipleChoice ? 'CHALLENGE' : 'QUESTION'}</span>
              </div>
              <div className="absolute bottom-6 right-8 opacity-5 select-none pointer-events-none">
                 <span className="material-icons-round text-8xl">contact_support</span>
@@ -243,33 +264,64 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
         </div>
       </div>
 
+      {/* Multiple Choice Options (Rendered separately below card if in test mode) */}
+      {isTestMode && isMultipleChoice && !selectedOption && !isTransitioning && (
+        <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8 animate-in slide-in-from-bottom-4 duration-300">
+          {currentCard.options?.map((opt, i) => (
+            <button
+              key={i}
+              onClick={() => handleMCOptionSelect(opt)}
+              className="p-4 bg-card border border-border rounded-lg text-left text-xs font-bold hover:border-primary hover:bg-primary/5 transition-all active:scale-[0.98] shadow-sm"
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Control Interface */}
       <div className="w-full space-y-6">
         {isTestMode ? (
           <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
-            {!showAnswer ? (
-              <div className="flex flex-col gap-3">
-                <Button onClick={() => {setShowAnswer(true); setIsFlipped(true);}} size="lg" className="w-full py-5 text-[10px] uppercase tracking-[0.3em] bg-white text-black hover:bg-white/90 shadow-xl">
-                  REVEAL ANSWER
-                </Button>
+            {isMultipleChoice ? (
+              selectedOption ? (
+                <div className="space-y-4">
+                  <div className={`p-4 rounded-lg border flex items-center justify-between ${selectedOption === currentCard.definition ? 'bg-green-500/10 border-green-500/30 text-green-500' : 'bg-destructive/10 border-destructive/30 text-destructive'}`}>
+                    <span className="text-[10px] font-black uppercase tracking-widest">{selectedOption === currentCard.definition ? 'CORRECT RECALL' : 'INCORRECT'}</span>
+                    <span className="material-icons-round">{selectedOption === currentCard.definition ? 'check_circle' : 'cancel'}</span>
+                  </div>
+                  <Button onClick={nextCard} size="lg" className="w-full py-5 text-[10px] uppercase tracking-[0.3em]">CONTINUE MODULE</Button>
+                </div>
+              ) : (
                 <Button onClick={handleSkip} variant="ghost" className="w-full py-4 text-[9px] uppercase tracking-widest border-border opacity-70 hover:opacity-100">
                   SKIP CARD
                 </Button>
-              </div>
+              )
             ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <Button onClick={() => handleTestAnswer(true)} variant="primary" className="py-5 text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-primary/20">
-                    CORRECT RECALL
+              !showAnswer ? (
+                <div className="flex flex-col gap-3">
+                  <Button onClick={() => {setShowAnswer(true); setIsFlipped(true);}} size="lg" className="w-full py-5 text-[10px] uppercase tracking-[0.3em] bg-white text-black hover:bg-white/90 shadow-xl">
+                    REVEAL ANSWER
                   </Button>
-                  <Button onClick={() => handleTestAnswer(false)} variant="secondary" className="py-5 text-[10px] uppercase tracking-[0.2em]">
-                    NEEDS REVIEW
+                  <Button onClick={handleSkip} variant="ghost" className="w-full py-4 text-[9px] uppercase tracking-widest border-border opacity-70 hover:opacity-100">
+                    SKIP CARD
                   </Button>
                 </div>
-                <Button onClick={handleSkip} variant="ghost" className="w-full py-4 text-[9px] uppercase tracking-widest border-border opacity-70 hover:opacity-100">
-                  SKIP CARD
-                </Button>
-              </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <Button onClick={() => handleTestAnswer(true)} variant="primary" className="py-5 text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-primary/20">
+                      CORRECT RECALL
+                    </Button>
+                    <Button onClick={() => handleTestAnswer(false)} variant="secondary" className="py-5 text-[10px] uppercase tracking-[0.2em]">
+                      NEEDS REVIEW
+                    </Button>
+                  </div>
+                  <Button onClick={handleSkip} variant="ghost" className="w-full py-4 text-[9px] uppercase tracking-widest border-border opacity-70 hover:opacity-100">
+                    SKIP CARD
+                  </Button>
+                </div>
+              )
             )}
           </div>
         ) : (

@@ -1,6 +1,7 @@
 export interface Flashcard {
   term: string;
   definition: string;
+  options?: string[]; // Optional for multiple choice support
 }
 
 export interface QuizQuestion {
