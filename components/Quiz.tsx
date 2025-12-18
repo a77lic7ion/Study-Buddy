@@ -46,11 +46,6 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete, is
     } else if (isRemediation) {
         onBack(); // Nothing to remediate
     }
-
-    if (!isRemediation) {
-        const saved = localStorage.getItem(sessionKey);
-        if (saved) { /* Optional: Restore previous session logic */ }
-    }
   }, [sessionKey, weakKey, isRemediation]);
 
   const saveProgress = useCallback((updatedIndex: number, updatedScore: number, updatedIncorrect: IncorrectAnswer[], currentQuestions: QuizQuestion[]) => {
@@ -146,28 +141,28 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete, is
   };
 
   if (status === 'loading') return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center p-8">
       <LoadingSpinner />
-      <p className="mt-8 font-black text-primary animate-pulse tracking-widest text-[10px] uppercase">
+      <p className="mt-8 font-black text-primary animate-pulse tracking-widest text-[10px] uppercase text-center">
         {isRemediation ? 'SYNTHESIZING REMEDIATION SCENARIOS...' : 'Processing Session Artifacts...'}
       </p>
     </div>
   );
 
   if (status === 'intro') return (
-    <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-10 animate-in zoom-in duration-300">
+    <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-6 sm:p-10 animate-in zoom-in duration-300 mx-auto">
       <div className="flex flex-col items-center mb-8">
         <div className="w-16 h-16 bg-secondary rounded-lg flex items-center justify-center mb-5 text-primary ring-1 ring-border shadow-sm">
           <span className="material-icons-round text-3xl">bolt</span>
         </div>
-        <h2 className="text-2xl font-black uppercase italic">Simulation Hub</h2>
+        <h2 className="text-2xl font-black uppercase italic italic">Simulation Hub</h2>
         <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1">Target: {profile.subject}</p>
       </div>
       
       <div className="space-y-6">
         <div className="space-y-3">
           <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Sim Focus (Optional)</label>
-          <input type="text" value={focusTopics} onChange={(e) => setFocusTopics(e.target.value)} placeholder="e.g. Algebra, History..." className="w-full bg-background border border-border rounded-xl p-4 text-xs text-foreground placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-primary outline-none transition-all" />
+          <input type="text" value={focusTopics} onChange={(e) => setFocusTopics(e.target.value)} placeholder="e.g. Algebra, History..." className="w-full bg-background border border-border rounded-xl p-4 text-xs font-bold text-white placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-primary outline-none transition-all" />
         </div>
 
         <div className="space-y-3">
@@ -190,28 +185,34 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete, is
   );
 
   if (status === 'review') return (
-    <div className="w-full max-w-2xl space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="bg-card border border-border p-12 rounded-2xl shadow-2xl relative overflow-hidden text-center">
+    <div className="w-full max-w-2xl space-y-6 sm:space-y-8 animate-in fade-in duration-500 pb-20 px-4">
+      <div className="bg-card border border-border p-8 sm:p-12 rounded-2xl shadow-2xl relative overflow-hidden text-center">
         <div className="absolute top-0 left-0 w-full h-1.5 bg-primary"></div>
-        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] mb-4 block">
+        <span className="text-[9px] sm:text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] mb-4 block">
             {isRemediation ? 'Remediation Session Finished' : 'Simulation Complete'}
         </span>
-        <span className="text-6xl md:text-8xl font-black text-primary drop-shadow-sm">{Math.round((score/questions.length)*100)}%</span>
-        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mt-6 italic">Mastery achieved across {questions.length} cycles</p>
+        <span className="text-5xl sm:text-7xl md:text-8xl font-black text-primary drop-shadow-sm">{Math.round((score/questions.length)*100)}%</span>
+        <p className="text-[9px] sm:text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mt-6 italic">Mastery achieved across {questions.length} cycles</p>
       </div>
 
       {reviews.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-xs font-black uppercase tracking-[0.3em] px-2 text-primary">Neural Gaps Analysis</h3>
+          <h3 className="text-[11px] sm:text-xs font-black uppercase tracking-[0.3em] px-2 text-primary">Neural Gaps Analysis</h3>
           {reviews.map((r, i) => (
-            <div key={i} className="bg-card border border-border p-8 rounded-2xl shadow-lg animate-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${i * 100}ms` }}>
-              <h4 className="font-bold text-foreground mb-6 leading-tight italic">{r.question}</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                <div className="bg-destructive/5 p-4 rounded-xl border border-destructive/10"><span className="text-[9px] font-black uppercase text-destructive mb-2 block tracking-widest">Your Input</span><p className="text-xs font-bold opacity-70">{r.userAnswer}</p></div>
-                <div className="bg-green-500/5 p-4 rounded-xl border border-green-500/10"><span className="text-[9px] font-black uppercase text-green-500 mb-2 block tracking-widest">Target Answer</span><p className="text-xs font-bold">{r.correctAnswer}</p></div>
+            <div key={i} className="bg-card border border-border p-6 sm:p-8 rounded-2xl shadow-lg animate-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${i * 100}ms` }}>
+              <h4 className="font-bold text-sm sm:text-base text-foreground mb-6 leading-tight italic">{r.question}</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6 text-xs font-bold uppercase italic italic">
+                <div className="bg-destructive/5 p-4 rounded-xl border border-destructive/10 leading-tight">
+                  <span className="text-[8px] font-black uppercase text-destructive mb-2 block tracking-widest not-italic">Your Input</span>
+                  <p className="opacity-70">{r.userAnswer}</p>
+                </div>
+                <div className="bg-green-500/5 p-4 rounded-xl border border-green-500/10 leading-tight">
+                  <span className="text-[8px] font-black uppercase text-green-500 mb-2 block tracking-widest not-italic">Target Answer</span>
+                  <p>{r.correctAnswer}</p>
+                </div>
               </div>
-              <div className="bg-secondary p-5 rounded-xl text-xs leading-relaxed text-muted-foreground italic border-l-4 border-primary shadow-inner">
-                <span className="text-[9px] font-black text-primary uppercase block mb-2 not-italic tracking-widest">Expert Briefing</span>
+              <div className="bg-secondary p-4 sm:p-5 rounded-xl text-[11px] sm:text-xs leading-relaxed text-muted-foreground italic border-l-4 border-primary shadow-inner">
+                <span className="text-[8px] sm:text-[9px] font-black text-primary uppercase block mb-2 not-italic tracking-widest">Expert Briefing</span>
                 {r.explanation}
               </div>
             </div>
@@ -230,36 +231,36 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete, is
   const progress = ((currentIndex + 1) / questions.length) * 100;
 
   return (
-    <div className="w-full flex flex-col items-center">
+    <div className="w-full flex flex-col items-center px-4">
       <div className="fixed top-0 left-0 w-full h-1.5 bg-secondary z-[60]">
         <div 
           className={`h-full ${isRemediation ? 'bg-destructive' : 'bg-primary'} shadow-[0_0_15px_rgba(79,70,229,0.8)] transition-all duration-500 ease-out`}
           style={{ width: `${progress}%` }}
         ></div>
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-card border border-border px-4 py-1.5 rounded-full shadow-lg">
-           <span className="text-[10px] font-black uppercase tracking-[0.3em] text-foreground">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-card border border-border px-3 py-1 sm:px-4 sm:py-1.5 rounded-full shadow-lg whitespace-nowrap">
+           <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] text-foreground">
              {isRemediation ? 'REMEDIATION' : 'Question'} {currentIndex + 1} <span className="text-muted-foreground">/ {questions.length}</span>
            </span>
         </div>
       </div>
 
-      <div className="w-full max-w-2xl bg-card border border-border rounded-2xl shadow-2xl p-8 mt-16 relative overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
-        <div className="flex items-center justify-between mb-10">
+      <div className="w-full max-w-2xl bg-card border border-border rounded-2xl shadow-2xl p-6 sm:p-8 mt-16 relative overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+        <div className="flex items-center justify-between mb-8 sm:mb-10">
           <div className="flex flex-col">
-            <span className={`text-[10px] font-black ${isRemediation ? 'text-destructive' : 'text-primary'} uppercase tracking-[0.3em] mb-1`}>{profile.subject}</span>
-            <span className="text-xl font-black">{isRemediation ? 'Restoration Phase' : 'Active Phase'}</span>
+            <span className={`text-[9px] sm:text-[10px] font-black ${isRemediation ? 'text-destructive' : 'text-primary'} uppercase tracking-[0.3em] mb-1`}>{profile.subject}</span>
+            <span className="text-lg sm:text-xl font-black">{isRemediation ? 'Restoration Phase' : 'Active Phase'}</span>
           </div>
-          <button onClick={finalizeQuiz} className="text-[9px] font-black uppercase tracking-widest text-destructive hover:opacity-70 transition-opacity flex items-center gap-2">
+          <button onClick={finalizeQuiz} className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-destructive hover:opacity-70 transition-opacity flex items-center gap-1 sm:gap-2">
             <span className="material-icons-round text-sm">cancel</span>
             Abort
           </button>
         </div>
-        <div className="mb-6 flex items-center gap-2">
+        <div className="mb-4 sm:mb-6 flex items-center gap-2">
             <span className={`material-icons-round ${isRemediation ? 'text-destructive' : 'text-primary'} text-xs`}>label</span>
-            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">{q.topic}</span>
+            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60 truncate">{q.topic}</span>
         </div>
-        <h3 className="text-xl md:text-2xl font-black mb-10 leading-tight italic">{q.question}</h3>
-        <div className="grid grid-cols-1 gap-3 mb-10">
+        <h3 className="text-lg sm:text-xl md:text-2xl font-black mb-8 sm:mb-10 leading-tight italic">{q.question}</h3>
+        <div className="grid grid-cols-1 gap-2 sm:gap-3 mb-8 sm:mb-10">
           {q.options.map(opt => {
             const isSelected = selected === opt;
             const isCorrect = opt === q.correctAnswer;
@@ -270,8 +271,8 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete, is
               else style = 'bg-background border-border opacity-30';
             }
             return (
-              <button key={opt} onClick={() => handleAnswer(opt)} disabled={!!selected} className={`p-5 rounded-xl border text-left transition-all duration-300 font-bold group flex items-center justify-between ${style}`}>
-                <span className="text-sm font-bold uppercase tracking-wide">{opt}</span>
+              <button key={opt} onClick={() => handleAnswer(opt)} disabled={!!selected} className={`p-4 sm:p-5 rounded-xl border text-left transition-all duration-300 font-bold group flex items-center justify-between ${style}`}>
+                <span className="text-xs sm:text-sm font-bold uppercase tracking-wide">{opt}</span>
                 {selected && isCorrect && <span className="material-icons-round text-sm">check_circle</span>}
                 {selected && isSelected && !isCorrect && <span className="material-icons-round text-sm">cancel</span>}
               </button>
