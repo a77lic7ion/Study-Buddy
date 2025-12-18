@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { User } from '../types';
 
@@ -5,6 +6,7 @@ interface HeaderProps {
   user?: User | null;
   onLogout: () => void;
   onProfile: () => void;
+  onSettings: () => void;
   onHome: () => void;
   showNav: boolean;
   isDarkMode: boolean;
@@ -15,6 +17,7 @@ const Header: React.FC<HeaderProps> = ({
   user, 
   onLogout, 
   onProfile, 
+  onSettings,
   onHome, 
   showNav, 
   isDarkMode, 
@@ -55,6 +58,13 @@ const Header: React.FC<HeaderProps> = ({
             <div className="h-8 w-px bg-border mx-2 hidden md:block"></div>
 
             <nav className="flex items-center gap-1">
+              <button 
+                onClick={onSettings}
+                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-primary"
+                title="System Settings"
+              >
+                <span className="material-icons-round text-xl">settings</span>
+              </button>
               <button 
                 onClick={onProfile}
                 className="relative w-10 h-10 flex items-center justify-center rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-primary overflow-hidden border border-transparent hover:border-border"

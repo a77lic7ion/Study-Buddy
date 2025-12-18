@@ -1,3 +1,4 @@
+
 export interface Flashcard {
   term: string;
   definition: string;
@@ -45,6 +46,23 @@ export interface UserProfile {
   subject: string;
 }
 
+export interface ApiProviderConfig {
+  baseUrl: string;
+  apiKey: string;
+  selectedModel: string;
+  availableModels: string[];
+}
+
+export interface ApiSettings {
+  activeProvider: 'gemini' | 'mistral' | 'openai' | 'ollama';
+  providers: {
+    gemini: ApiProviderConfig;
+    mistral: ApiProviderConfig;
+    openai: ApiProviderConfig;
+    ollama: ApiProviderConfig;
+  };
+}
+
 export enum AppView {
   INTRO,
   AUTH,
@@ -53,5 +71,6 @@ export enum AppView {
   FLASHCARDS,
   QUIZ,
   PROFILE,
-  REPORT_CARD
+  REPORT_CARD,
+  SETTINGS
 }

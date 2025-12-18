@@ -1,5 +1,6 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
-import { AppView, TestResult, UserProfile, User } from './types';
+import { AppView, TestResult, UserProfile, User, ApiSettings } from './types';
 import FlashcardViewer from './components/FlashcardViewer';
 import Quiz from './components/Quiz';
 import Header from './components/Header';
@@ -10,11 +11,43 @@ import AuthView from './components/AuthView';
 import ProfileView from './components/ProfileView';
 import IntroSequence from './components/IntroSequence';
 import ReportCardView from './components/ReportCardView';
+import SettingsView from './components/SettingsView';
+
+const DEFAULT_API_SETTINGS: ApiSettings = {
+  activeProvider: 'gemini',
+  providers: {
+    gemini: {
+      baseUrl: '',
+      apiKey: '',
+      selectedModel: 'gemini-3-flash-preview',
+      availableModels: ['gemini-3-flash-preview', 'gemini-3-pro-preview']
+    },
+    mistral: {
+      baseUrl: 'https://api.mistral.ai/v1',
+      apiKey: '',
+      selectedModel: '',
+      availableModels: []
+    },
+    openai: {
+      baseUrl: 'https://api.openai.com/v1',
+      apiKey: '',
+      selectedModel: '',
+      availableModels: []
+    },
+    ollama: {
+      baseUrl: 'http://localhost:11434',
+      apiKey: '',
+      selectedModel: '',
+      availableModels: []
+    }
+  }
+};
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<AppView>(AppView.INTRO);
   const [testScores, setTestScores] = useState<TestResult[]>([]);
+  const [apiSettings, setApiSettings] = useState<ApiSettings>(DEFAULT_API_SETTINGS);
   const [isDarkMode, setIsDarkMode] = useState(true);
 
   const getStoredItem = (key: string) => {
@@ -58,6 +91,13 @@ const App: React.FC = () => {
         setTestScores(JSON.parse(storedScoresRaw));
       } catch (e) {}
     }
+
+    const storedSettingsRaw = getStoredItem('apiSettings');
+    if (storedSettingsRaw) {
+      try {
+        setApiSettings(JSON.parse(storedSettingsRaw));
+      } catch (e) {}
+    }
   }, []);
 
   const toggleTheme = () => {
@@ -88,13 +128,13 @@ const App: React.FC = () => {
     setCurrentView(AppView.HOME);
   };
 
-  const handleTestComplete = useCallback((score: number, type: 'quiz' | 'flashcard') => {
+  const handleTestComplete = useCallback((score: number) => {
     if (!currentUser || !currentUser.profile) return;
     
     const newScore: TestResult = {
       score,
       date: new Date().toISOString(),
-      type,
+      type: currentView === AppView.QUIZ ? 'quiz' : 'flashcard',
       subject: currentUser.profile.subject,
       grade: currentUser.profile.grade,
       userId: currentUser.id
@@ -105,12 +145,16 @@ const App: React.FC = () => {
       localStorage.setItem('testScores', JSON.stringify(updated));
       return updated;
     });
-  }, [currentUser]);
+  }, [currentUser, currentView]);
+
+  const handleSaveSettings = (newSettings: ApiSettings) => {
+    setApiSettings(newSettings);
+    localStorage.setItem('apiSettings', JSON.stringify(newSettings));
+  };
 
   const userScores = testScores.filter(s => s.userId === currentUser?.id);
   const subjectScores = userScores.filter(s => s.subject === currentUser?.profile?.subject);
 
-  // Calculate stats for all practiced subjects
   const subjectSummaries = userScores.reduce((acc: any, curr) => {
     if (!acc[curr.subject]) acc[curr.subject] = { total: 0, count: 0, best: 0 };
     acc[curr.subject].total += curr.score;
@@ -125,12 +169,14 @@ const App: React.FC = () => {
     if (!currentUser) return null;
 
     switch (currentView) {
+      case AppView.SETTINGS:
+        return <SettingsView settings={apiSettings} onSave={handleSaveSettings} onBack={() => setCurrentView(AppView.HOME)} />;
       case AppView.SETUP:
         return <SetupView onComplete={handleSetupComplete} initialProfile={currentUser.profile} />;
       case AppView.FLASHCARDS:
-        return <FlashcardViewer userId={currentUser.id} profile={currentUser.profile!} onBack={() => setCurrentView(AppView.HOME)} onTestComplete={(s) => handleTestComplete(s, 'flashcard')} />;
+        return <FlashcardViewer userId={currentUser.id} profile={currentUser.profile!} onBack={() => setCurrentView(AppView.HOME)} onTestComplete={handleTestComplete} />;
       case AppView.QUIZ:
-        return <Quiz profile={currentUser.profile!} userId={currentUser.id} onBack={() => setCurrentView(AppView.HOME)} onTestComplete={(s) => handleTestComplete(s, 'quiz')} />;
+        return <Quiz profile={currentUser.profile!} userId={currentUser.id} onBack={() => setCurrentView(AppView.HOME)} onTestComplete={handleTestComplete} />;
       case AppView.PROFILE:
         return <ProfileView user={currentUser} scores={userScores} onBack={() => setCurrentView(AppView.HOME)} onUpdateUser={(u) => {setCurrentUser(u); localStorage.setItem('currentUser', JSON.stringify(u));}} onOpenReportCard={() => setCurrentView(AppView.REPORT_CARD)} />;
       case AppView.REPORT_CARD:
@@ -208,7 +254,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden bg-background">
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] -z-10 opacity-30 pointer-events-none"></div>
-      <Header user={currentUser} onLogout={handleLogout} onProfile={() => setCurrentView(AppView.PROFILE)} onHome={() => setCurrentView(AppView.HOME)} showNav={currentView !== AppView.INTRO} isDarkMode={isDarkMode} onToggleTheme={toggleTheme} />
+      <Header user={currentUser} onLogout={handleLogout} onProfile={() => setCurrentView(AppView.PROFILE)} onSettings={() => setCurrentView(AppView.SETTINGS)} onHome={() => setCurrentView(AppView.HOME)} showNav={currentView !== AppView.INTRO} isDarkMode={isDarkMode} onToggleTheme={toggleTheme} />
       <main className="flex-grow flex flex-col px-4 py-8 relative z-0">
         <div className="w-full max-w-6xl mx-auto flex-grow flex items-center justify-center">{renderContent()}</div>
       </main>
