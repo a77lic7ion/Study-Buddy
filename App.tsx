@@ -14,24 +14,44 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<AppView>(AppView.INTRO);
   const [testScores, setTestScores] = useState<TestResult[]>([]);
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
   useEffect(() => {
+    // Initial theme setup
+    const storedTheme = localStorage.getItem('theme');
+    const darkMode = storedTheme === null ? true : storedTheme === 'dark';
+    setIsDarkMode(darkMode);
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+
     const hasSeenIntro = localStorage.getItem('hasSeenIntro');
     const storedUser = localStorage.getItem('currentUser');
     
     if (storedUser) {
       const user = JSON.parse(storedUser);
       setCurrentUser(user);
-      // If we have a user, skip intro
       setCurrentView(user.profile ? AppView.HOME : AppView.SETUP);
     } else if (hasSeenIntro) {
-      // If intro seen but no user, go to Auth
       setCurrentView(AppView.AUTH);
     }
 
     const storedScores = localStorage.getItem('testScores');
     if (storedScores) setTestScores(JSON.parse(storedScores));
   }, []);
+
+  const toggleTheme = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    localStorage.setItem('theme', newMode ? 'dark' : 'light');
+    if (newMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
 
   const handleIntroComplete = () => {
     localStorage.setItem('hasSeenIntro', 'true');
@@ -64,6 +84,18 @@ const App: React.FC = () => {
     }
 
     setCurrentView(AppView.HOME);
+  };
+
+  const handleUserUpdate = (updatedUser: User) => {
+    setCurrentUser(updatedUser);
+    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+    
+    const users = JSON.parse(localStorage.getItem('users') || '[]');
+    const index = users.findIndex((u: User) => u.id === updatedUser.id);
+    if (index !== -1) {
+      users[index] = updatedUser;
+      localStorage.setItem('users', JSON.stringify(users));
+    }
   };
 
   const handleTestComplete = useCallback((score: number, type: 'quiz' | 'flashcard') => {
@@ -107,7 +139,7 @@ const App: React.FC = () => {
       case AppView.QUIZ:
         return <Quiz profile={currentUser.profile!} userId={currentUser.id} onBack={() => setCurrentView(AppView.HOME)} onTestComplete={(s) => handleTestComplete(s, 'quiz')} />;
       case AppView.PROFILE:
-        return <ProfileView user={currentUser} scores={userScores} onBack={() => setCurrentView(AppView.HOME)} />;
+        return <ProfileView user={currentUser} scores={userScores} onBack={() => setCurrentView(AppView.HOME)} onUpdateUser={handleUserUpdate} />;
       case AppView.HOME:
       default:
         return (
@@ -187,15 +219,17 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden bg-background">
       {/* Decorative Blobs */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] -z-10 opacity-40 pointer-events-none"></div>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] -z-10 opacity-40 pointer-events-none transition-opacity duration-1000"></div>
       <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px] -z-10 pointer-events-none"></div>
 
       <Header 
-        profile={currentUser?.profile} 
+        user={currentUser}
         onLogout={handleLogout} 
         onProfile={() => setCurrentView(AppView.PROFILE)} 
         onHome={() => setCurrentView(AppView.HOME)}
-        showNav={currentView !== AppView.AUTH && currentView !== AppView.INTRO}
+        showNav={currentView !== AppView.INTRO}
+        isDarkMode={isDarkMode}
+        onToggleTheme={toggleTheme}
       />
       
       <main className="flex-grow flex flex-col px-4 py-12 relative z-0">

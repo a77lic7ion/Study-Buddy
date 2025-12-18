@@ -15,6 +15,7 @@ export interface User {
   email: string;
   password?: string; // Only for local simulation
   profile?: UserProfile;
+  profileImage?: string; // Base64 encoded image
 }
 
 export interface TestResult {

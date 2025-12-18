@@ -114,6 +114,18 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
     }
   };
 
+  const handleSkip = () => {
+    if (isTransitioning) return;
+    if (currentIndex < cards.length - 1) {
+      nextCard();
+    } else {
+      // Finish without scoring the last card
+      onTestComplete(Math.round((testScore / cards.length) * 100));
+      localStorage.removeItem(persistenceKey);
+      onBack();
+    }
+  };
+
   if (preSetup) {
     return (
       <div className="w-full max-w-md bg-card border border-border rounded-lg shadow-2xl p-10 animate-in zoom-in duration-300">
@@ -236,16 +248,26 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
         {isTestMode ? (
           <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
             {!showAnswer ? (
-              <Button onClick={() => {setShowAnswer(true); setIsFlipped(true);}} size="lg" className="w-full py-5 text-[10px] uppercase tracking-[0.3em] bg-white text-black hover:bg-white/90 shadow-xl">
-                REVEAL ANSWER
-              </Button>
-            ) : (
-              <div className="grid grid-cols-2 gap-4">
-                <Button onClick={() => handleTestAnswer(true)} variant="primary" className="py-5 text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-primary/20">
-                  CORRECT RECALL
+              <div className="flex flex-col gap-3">
+                <Button onClick={() => {setShowAnswer(true); setIsFlipped(true);}} size="lg" className="w-full py-5 text-[10px] uppercase tracking-[0.3em] bg-white text-black hover:bg-white/90 shadow-xl">
+                  REVEAL ANSWER
                 </Button>
-                <Button onClick={() => handleTestAnswer(false)} variant="secondary" className="py-5 text-[10px] uppercase tracking-[0.2em]">
-                  NEEDS REVIEW
+                <Button onClick={handleSkip} variant="ghost" className="w-full py-4 text-[9px] uppercase tracking-widest border-border opacity-70 hover:opacity-100">
+                  SKIP CARD
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <Button onClick={() => handleTestAnswer(true)} variant="primary" className="py-5 text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-primary/20">
+                    CORRECT RECALL
+                  </Button>
+                  <Button onClick={() => handleTestAnswer(false)} variant="secondary" className="py-5 text-[10px] uppercase tracking-[0.2em]">
+                    NEEDS REVIEW
+                  </Button>
+                </div>
+                <Button onClick={handleSkip} variant="ghost" className="w-full py-4 text-[9px] uppercase tracking-widest border-border opacity-70 hover:opacity-100">
+                  SKIP CARD
                 </Button>
               </div>
             )}

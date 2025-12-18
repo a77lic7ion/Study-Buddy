@@ -22,13 +22,31 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
   const [reviews, setReviews] = useState<QuestionReview[]>([]);
   const [focusTopics, setFocusTopics] = useState("");
   const [hasSavedSession, setHasSavedSession] = useState(false);
+  const [weakTopics, setWeakTopics] = useState<string[]>([]);
 
   const sessionKey = `quiz_session_${userId}_${profile.grade}_${profile.subject}`;
+  const weakKey = `weakTopics_${userId}_${profile.grade}_${profile.subject}`;
 
   useEffect(() => {
+    // Check for saved quiz sessions
     const saved = localStorage.getItem(sessionKey);
     if (saved) setHasSavedSession(true);
-  }, [sessionKey]);
+
+    // Initialize/Load weak topics from localStorage on mount
+    const storedWeak = localStorage.getItem(weakKey);
+    if (storedWeak) {
+      try {
+        setWeakTopics(JSON.parse(storedWeak));
+      } catch (e) {
+        console.error("Failed to parse weak topics", e);
+        setWeakTopics([]);
+      }
+    } else {
+      // If no topics are found, initialize an empty array in storage
+      localStorage.setItem(weakKey, JSON.stringify([]));
+      setWeakTopics([]);
+    }
+  }, [sessionKey, weakKey]);
 
   const saveProgress = useCallback((updatedIndex: number, updatedScore: number, updatedIncorrect: IncorrectAnswer[], currentQuestions: QuizQuestion[]) => {
     const sessionData = {
@@ -61,11 +79,10 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
 
   const start = async () => {
     setStatus('loading');
-    const weakKey = `weakTopics_${userId}_${profile.grade}_${profile.subject}`;
-    const weakTopics = JSON.parse(localStorage.getItem(weakKey) || '[]');
     const topicsArray = focusTopics.split(',').map(t => t.trim()).filter(t => t.length > 0);
     
     try {
+      // Use the pre-loaded weakTopics from state for adaptive generation
       const qs = await generateQuizQuestions(profile, weakTopics, topicsArray);
       setQuestions(qs);
       setScore(0);
@@ -111,10 +128,10 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
       onTestComplete(finalScore);
       localStorage.removeItem(sessionKey);
 
-      const weakKey = `weakTopics_${userId}_${profile.grade}_${profile.subject}`;
-      const existing = JSON.parse(localStorage.getItem(weakKey) || '[]');
+      // Persist newly identified weak topics
       const newlyWeak = incorrect.map(i => i.question.topic);
-      const combined = Array.from(new Set([...existing, ...newlyWeak])).slice(-20);
+      const combined = Array.from(new Set([...weakTopics, ...newlyWeak])).slice(-20);
+      setWeakTopics(combined);
       localStorage.setItem(weakKey, JSON.stringify(combined));
 
       if (incorrect.length > 0) {
@@ -144,12 +161,26 @@ const Quiz: React.FC<QuizProps> = ({ profile, userId, onBack, onTestComplete }) 
           <span className="material-icons-round text-3xl">bolt</span>
         </div>
         <h2 className="text-2xl font-bold mb-2">Quiz Config</h2>
-        <p className="text-sm text-muted-foreground font-medium text-center">Calibrating neural assessment...</p>
+        <p className="text-sm text-muted-foreground font-medium text-center italic">Calibrating neural assessment...</p>
       </div>
       
       <div className="space-y-6">
+        {weakTopics.length > 0 && (
+          <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+            <span className="text-[9px] font-black text-primary uppercase tracking-widest block mb-2">ADAPTIVE FOCUS DETECTED</span>
+            <div className="flex flex-wrap gap-1.5">
+              {weakTopics.slice(0, 5).map((topic, idx) => (
+                <span key={idx} className="px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded text-[8px] font-bold uppercase">
+                  {topic}
+                </span>
+              ))}
+              {weakTopics.length > 5 && <span className="text-[8px] text-muted-foreground font-bold">+{weakTopics.length - 5} MORE</span>}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-3">
-          <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest ml-1">Focus Topics</label>
+          <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest ml-1">Manual Focus Topics</label>
           <input 
             type="text"
             value={focusTopics}
