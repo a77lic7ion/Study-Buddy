@@ -24,13 +24,13 @@ const Header: React.FC<HeaderProps> = ({
     <header className="w-full px-6 py-6 flex items-center justify-between z-10 relative">
       <div className="flex items-center gap-3 cursor-pointer group" onClick={onHome}>
         <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20 ring-1 ring-border group-hover:scale-105 transition-transform">
-          <span className="material-icons-round text-2xl">menu_book</span>
+          <span className="material-icons-round text-2xl">hardware</span>
         </div>
         <div className="flex flex-col">
           <h1 className="text-xl font-bold tracking-tight text-foreground leading-none">
-            STUDY<span className="text-primary">BUDDY</span>
+            NEURO<span className="text-primary">FORGE</span>
           </h1>
-          <span className="text-[0.65rem] font-bold tracking-[0.2em] text-muted-foreground uppercase mt-1">Adaptive AI</span>
+          <span className="text-[0.65rem] font-bold tracking-[0.2em] text-muted-foreground uppercase mt-1">Adaptive Intelligence</span>
         </div>
       </div>
       

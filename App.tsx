@@ -146,7 +146,7 @@ const App: React.FC = () => {
           <div className="w-full max-w-4xl mx-auto space-y-12 animate-in fade-in zoom-in duration-500">
             <div className="text-center relative">
               <h1 className="text-4xl md:text-6xl font-black text-foreground mb-4 tracking-tighter">
-                MASTER YOUR <span className="text-primary">STUDIES</span>
+                FORGE YOUR <span className="text-primary">MASTERY</span>
               </h1>
               <div className="flex justify-center items-center gap-3">
                 <span className="px-3 py-1 bg-secondary border border-border rounded-md text-xs font-bold text-muted-foreground uppercase tracking-widest">
@@ -166,8 +166,8 @@ const App: React.FC = () => {
                 <div className="absolute top-0 right-0 p-4 text-primary/20 group-hover:text-primary/40 transition-colors">
                   <span className="material-icons-round text-6xl">style</span>
                 </div>
-                <h3 className="text-2xl font-bold mb-2 group-hover:text-primary transition-colors">AI Flashcards</h3>
-                <p className="text-sm text-muted-foreground">Dynamic revision decks powered by Gemini AI.</p>
+                <h3 className="text-2xl font-bold mb-2 group-hover:text-primary transition-colors">Neural Forge</h3>
+                <p className="text-sm text-muted-foreground">Dynamic revision decks powered by adaptive intelligence.</p>
                 <div className="mt-6 flex items-center text-primary font-bold text-xs uppercase tracking-widest">
                   Launch Module <span className="material-icons-round ml-2 text-sm">arrow_forward</span>
                 </div>
@@ -180,8 +180,8 @@ const App: React.FC = () => {
                 <div className="absolute top-0 right-0 p-4 text-primary/20 group-hover:text-primary/40 transition-colors">
                   <span className="material-icons-round text-6xl">quiz</span>
                 </div>
-                <h3 className="text-2xl font-bold mb-2 group-hover:text-primary transition-colors">Adaptive Quiz</h3>
-                <p className="text-sm text-muted-foreground">Real-time assessment that learns from your mistakes.</p>
+                <h3 className="text-2xl font-bold mb-2 group-hover:text-primary transition-colors">Assessment Forge</h3>
+                <p className="text-sm text-muted-foreground">Real-time challenges that evolve with your learning path.</p>
                 <div className="mt-6 flex items-center text-primary font-bold text-xs uppercase tracking-widest">
                   Begin Test <span className="material-icons-round ml-2 text-sm">arrow_forward</span>
                 </div>
@@ -206,7 +206,7 @@ const App: React.FC = () => {
                   <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">System Status</p>
                   <div className="flex items-center gap-2 mt-2">
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                    <span className="text-xs text-foreground font-medium">AI Engine Online</span>
+                    <span className="text-xs text-foreground font-medium">Forge Engine Online</span>
                   </div>
                 </div>
               </div>
@@ -239,7 +239,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="w-full py-6 text-center z-10 opacity-30">
-        <p className="text-[10px] text-muted-foreground font-bold tracking-[0.2em] uppercase">© 2024 STUDYBUDDY AI • NEURAL ASSESSMENT ENGINE</p>
+        <p className="text-[10px] text-muted-foreground font-bold tracking-[0.2em] uppercase">© 2024 NEUROFORGE • ADAPTIVE INTELLIGENCE ENGINE</p>
       </footer>
     </div>
   );

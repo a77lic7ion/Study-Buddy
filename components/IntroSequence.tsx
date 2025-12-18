@@ -20,7 +20,7 @@ const IntroSequence: React.FC<IntroSequenceProps> = ({ onComplete }) => {
   const stages = [
     "INITIALIZING CORE...",
     "SYNCING NEURAL PATHWAYS...",
-    "CALIBRATING ADAPTIVE ENGINE...",
+    "CALIBRATING FORGE ENGINE...",
     "SYSTEM READY"
   ];
 
@@ -37,14 +37,14 @@ const IntroSequence: React.FC<IntroSequenceProps> = ({ onComplete }) => {
           <div className="absolute inset-0 border-2 border-primary rounded-full animate-ping opacity-20"></div>
           <div className="absolute inset-2 border-2 border-primary/40 rounded-lg animate-spin-slow"></div>
           <div className="absolute inset-4 bg-primary/20 rounded flex items-center justify-center backdrop-blur-md border border-primary/30">
-            <span className="material-icons-round text-primary text-4xl animate-pulse">auto_stories</span>
+            <span className="material-icons-round text-primary text-4xl animate-pulse">hardware</span>
           </div>
         </div>
 
         {/* Text Sequence */}
         <div className="text-center space-y-4">
           <h1 className="text-2xl font-black tracking-[0.4em] text-foreground flex items-center justify-center gap-2">
-            STUDY<span className="text-primary">BUDDY</span>
+            NEURO<span className="text-primary">FORGE</span>
           </h1>
           <div className="h-6 flex items-center justify-center">
              <span className="text-[10px] font-bold text-primary tracking-[0.3em] uppercase transition-all duration-500">
