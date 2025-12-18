@@ -7,7 +7,7 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link rel="stylesheet" href="/index.css" />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
     <script>
       tailwind.config = {
@@ -55,8 +55,9 @@
               sm: "calc(var(--radius) - 4px)",
             },
             fontFamily: {
-              mono: ["JetBrains Mono", "monospace"],
-              sans: ["JetBrains Mono", "monospace"],
+              sans: ["Montserrat", "sans-serif"],
+              serif: ["Playfair Display", "serif"],
+              mono: ["Source Code Pro", "monospace"],
             },
           }
         }
@@ -110,7 +111,8 @@
         }
       }
       body {
-        @apply bg-background text-foreground font-mono antialiased transition-colors duration-300;
+        @apply bg-background text-foreground font-sans antialiased transition-colors duration-300;
+        font-size: 1.05rem;
       }
       .preserve-3d {
         transform-style: preserve-3d;
