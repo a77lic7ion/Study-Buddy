@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Flashcard, UserProfile } from '../types';
 import { generateFlashcards } from '../services/geminiService';
@@ -29,6 +30,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
   const [showAnswer, setShowAnswer] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [showExplanation, setShowExplanation] = useState(false);
 
   const persistenceKey = `flashcard_session_${userId}_${profile.grade}_${profile.subject}`;
 
@@ -65,6 +67,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
       setTestScore(0);
       setCardsEvaluated(0);
       setSelectedOption(null);
+      setShowExplanation(false);
       localStorage.setItem(persistenceKey, JSON.stringify({ cards: aiCards, index: 0 }));
       setStatus('active');
     } catch (e) {
@@ -83,6 +86,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
       setIsFlipped(false);
       setShowAnswer(false);
       setSelectedOption(null);
+      setShowExplanation(false);
       setTimeout(() => setIsTransitioning(false), 50);
     }, 250);
   };
@@ -105,7 +109,6 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
       return;
     }
     const finalScore = Math.round((testScore / cardsEvaluated) * 100);
-    // Fixed: Removed the second argument 'flashcard' as the interface only expects 'score: number'
     onTestComplete(finalScore);
     localStorage.removeItem(persistenceKey);
     onBack();
@@ -245,22 +248,46 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
 
       <div className="w-full mb-10 group" style={{ perspective: '2000px' }}>
         <div 
-          className={`relative w-full h-[22rem] transition-all duration-700 ease-out preserve-3d cursor-pointer 
+          className={`relative w-full min-h-[22rem] transition-all duration-700 ease-out preserve-3d cursor-pointer 
             ${isFlipped ? '[transform:rotateY(180deg)]' : ''} 
             ${isTransitioning ? 'opacity-0 scale-95 -translate-y-4' : 'opacity-100 scale-100 translate-y-0'}`}
           onClick={() => !isTransitioning && !isMultipleChoice && setIsFlipped(!isFlipped)}
         >
+          {/* Front of card */}
           <div className={`absolute inset-0 bg-card border border-border rounded-2xl shadow-2xl flex flex-col items-center justify-center p-12 text-center backface-hidden ring-1 ring-white/5 transition-opacity duration-300 ${isFlipped ? 'opacity-0' : 'opacity-100'}`} style={{ zIndex: isFlipped ? 0 : 1 }}>
              <div className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-secondary border border-border rounded-full shadow-sm">
                <span className="text-[8px] font-black uppercase tracking-[0.3em] text-muted-foreground">{isMultipleChoice ? 'CHALLENGE' : 'QUESTION'}</span>
              </div>
              <h2 className="text-xl md:text-2xl font-black leading-tight text-foreground italic antialiased">{currentCard?.term}</h2>
           </div>
-          <div className={`absolute inset-0 bg-primary/5 border border-primary/20 rounded-2xl shadow-2xl flex flex-col items-center justify-center p-12 text-center backface-hidden [transform:rotateY(180deg)] ring-1 ring-primary/20 transition-opacity duration-300 ${isFlipped ? 'opacity-100' : 'opacity-0'}`} style={{ zIndex: isFlipped ? 1 : 0 }}>
+
+          {/* Back of card */}
+          <div className={`absolute inset-0 bg-primary/5 border border-primary/20 rounded-2xl shadow-2xl flex flex-col items-center justify-start p-12 text-center backface-hidden [transform:rotateY(180deg)] ring-1 ring-primary/20 transition-opacity duration-300 overflow-y-auto custom-scrollbar ${isFlipped ? 'opacity-100' : 'opacity-0'}`} style={{ zIndex: isFlipped ? 1 : 0 }}>
              <div className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-primary/20 border border-primary/30 rounded-full shadow-sm">
                <span className="text-[8px] font-black uppercase tracking-[0.3em] text-primary">DEFINITION</span>
              </div>
-             <p className="text-base md:text-lg font-bold leading-relaxed text-foreground antialiased max-w-sm">{currentCard?.definition}</p>
+             
+             <div className="mt-8 flex flex-col items-center gap-6 w-full">
+               <p className="text-base md:text-lg font-bold leading-relaxed text-foreground antialiased max-w-sm">{currentCard?.definition}</p>
+               
+               {/* AI Explanation Toggle & Content */}
+               <div className="w-full border-t border-primary/10 pt-6 mt-2 space-y-4">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setShowExplanation(!showExplanation); }}
+                    className="flex items-center gap-2 mx-auto text-[9px] font-black uppercase tracking-[0.3em] text-primary/70 hover:text-primary transition-colors"
+                  >
+                    <span className="material-icons-round text-sm">{showExplanation ? 'visibility_off' : 'auto_awesome'}</span>
+                    {showExplanation ? 'HIDE BREAKDOWN' : 'EXPLAIN CONCEPT'}
+                  </button>
+                  
+                  {showExplanation && (
+                    <div className="bg-primary/5 border border-primary/10 rounded-xl p-6 text-xs text-left leading-relaxed text-muted-foreground italic animate-in fade-in slide-in-from-top-2 duration-300">
+                      <span className="text-[8px] font-black text-primary uppercase block mb-3 tracking-widest not-italic">Neural Insights</span>
+                      {currentCard?.explanation}
+                    </div>
+                  )}
+               </div>
+             </div>
           </div>
         </div>
       </div>
@@ -293,7 +320,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
             ) : (
               !showAnswer ? (
                 <div className="flex flex-col gap-3">
-                  <Button onClick={() => {setShowAnswer(true); setIsFlipped(true);}} size="lg" className="w-full py-5 text-[10px] uppercase tracking-[0.3em] bg-white text-black hover:bg-white/90 shadow-xl">REVEAL ANSWER</Button>
+                  <Button onClick={() => {setShowAnswer(true); setIsFlipped(true); setShowExplanation(true);}} size="lg" className="w-full py-5 text-[10px] uppercase tracking-[0.3em] bg-white text-black hover:bg-white/90 shadow-xl">REVEAL ANSWER</Button>
                   <Button onClick={handleSkip} variant="ghost" className="w-full py-4 text-[9px] uppercase tracking-widest border-border">SKIP CARD</Button>
                 </div>
               ) : (

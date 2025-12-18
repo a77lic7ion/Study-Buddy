@@ -3,6 +3,7 @@ export interface Flashcard {
   term: string;
   definition: string;
   options?: string[]; // Optional for multiple choice support
+  explanation?: string; // Added for AI-generated deep-dives
 }
 
 export interface QuizQuestion {

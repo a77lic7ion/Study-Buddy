@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { QuizQuestion, IncorrectAnswer, QuestionReview, Flashcard, UserProfile } from '../types';
 
@@ -32,6 +33,7 @@ export const generateFlashcards = async (profile: UserProfile, difficulty: strin
   The content should align with standard school curriculums. 
   IMPORTANT: The "term" property should be a full, descriptive question.
   For cards with "options", ensure the "definition" matches exactly one of the options.
+  Include an "explanation" field for every card that provides a concise, insightful breakdown of the concept (2-3 sentences).
   Focus on key terms, definitions, and core concepts appropriate for the ${difficulty} level.`;
 
   const schema = {
@@ -41,13 +43,14 @@ export const generateFlashcards = async (profile: UserProfile, difficulty: strin
       properties: {
         term: { type: Type.STRING, description: "A descriptive question about the concept" },
         definition: { type: Type.STRING, description: "The answer or definition" },
+        explanation: { type: Type.STRING, description: "A concise AI-generated educational breakdown" },
         options: { 
           type: Type.ARRAY, 
           items: { type: Type.STRING },
           description: "4 distractors including the correct answer if this is a multiple-choice card"
         }
       },
-      required: ["term", "definition"]
+      required: ["term", "definition", "explanation"]
     }
   };
 
