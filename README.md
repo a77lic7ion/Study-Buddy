@@ -32,10 +32,29 @@ NeuroForge is a high-performance educational platform designed for the modern sc
 
 ---
 
-<img width="580" height="686" alt="image" src="https://github.com/user-attachments/assets/73f3b0e8-762e-4f69-9d66-2e9ffaa5e24e" />
+<img width="145" height="171" alt="image" src="https://github.com/user-attachments/assets/73f3b0e8-762e-4f69-9d66-2e9ffaa5e24e" />
 
-<img width="995" height="792" alt="image" src="https://github.com/user-attachments/assets/6ad55c0d-f5f7-488d-b578-70859d1725e9" />
+<img width="248" height="198" alt="image" src="https://github.com/user-attachments/assets/6ad55c0d-f5f7-488d-b578-70859d1725e9" />
 
+<img width="170" height="173" alt="image" src="https://github.com/user-attachments/assets/de103f01-6313-4f1f-8f14-a71d9c450a85" />
+
+<img width="198" height="169" alt="image" src="https://github.com/user-attachments/assets/146bc789-cb42-4e16-9ec1-7b43448ab9c1" />
+
+<img width="182" height="172" alt="image" src="https://github.com/user-attachments/assets/13e60a0d-fb6a-46dc-91a0-3e9b0e254a32" />
+
+<img width="185" height="182" alt="image" src="https://github.com/user-attachments/assets/517b1bb8-3c11-4f91-817b-4ca359805188" />
+
+<img width="177" height="208" alt="image" src="https://github.com/user-attachments/assets/80cd1c1f-60a7-4e65-b1d2-e09a45b9665a" />
+
+<img width="202" height="194" alt="image" src="https://github.com/user-attachments/assets/b7ce2ce1-8020-4b0f-9127-dce380226db9" />
+
+<img width="155" height="161" alt="image" src="https://github.com/user-attachments/assets/875094d7-e62b-4b66-93bf-f1e5011c58df" />
+
+<img width="155" height="175" alt="image" src="https://github.com/user-attachments/assets/82fbb0ce-5aab-48bd-b21d-b1d7f533ad9c" />
+
+<img width="456" height="213" alt="image" src="https://github.com/user-attachments/assets/b74f5ca0-15c9-46b2-8a85-14a82e60ff0b" />
+
+<img width="239" height="95" alt="image" src="https://github.com/user-attachments/assets/8313244b-8a41-4fcc-acd7-61603b9b3f52" />
 
 
 
