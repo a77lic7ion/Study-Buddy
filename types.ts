@@ -1,4 +1,3 @@
-
 export interface Flashcard {
   term: string;
   definition: string;
@@ -55,12 +54,15 @@ export interface ApiProviderConfig {
 }
 
 export interface ApiSettings {
-  activeProvider: 'gemini' | 'mistral' | 'openai' | 'ollama';
+  activeProvider: 'gemini' | 'mistral' | 'openai' | 'ollama' | 'cloudflare' | 'deepseek' | 'openrouter';
   providers: {
     gemini: ApiProviderConfig;
     mistral: ApiProviderConfig;
     openai: ApiProviderConfig;
     ollama: ApiProviderConfig;
+    cloudflare: ApiProviderConfig;
+    deepseek: ApiProviderConfig;
+    openrouter: ApiProviderConfig;
   };
 }
 

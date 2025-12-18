@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { QuizQuestion, IncorrectAnswer, QuestionReview, Flashcard, UserProfile, ApiSettings } from '../types';
 
@@ -55,9 +54,18 @@ const requestAI = async (prompt: string, schema: any): Promise<any> => {
     }
 
     const isOllama = activeProvider === 'ollama';
-    const endpoint = isOllama 
-      ? `${config.baseUrl}/api/generate` 
-      : `${config.baseUrl}/chat/completions`;
+    const isCloudflare = activeProvider === 'cloudflare';
+    
+    // Determine the endpoint
+    let endpoint = config.baseUrl;
+    if (isOllama) {
+      endpoint = `${config.baseUrl}/api/generate`;
+    } else if (isCloudflare) {
+      // Cloudflare native API usually looks like: .../ai/run/{model}
+      endpoint = `${config.baseUrl}/${config.selectedModel}`;
+    } else if (!endpoint.endsWith('/chat/completions')) {
+      endpoint = `${endpoint.replace(/\/+$/, '')}/chat/completions`;
+    }
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -66,18 +74,28 @@ const requestAI = async (prompt: string, schema: any): Promise<any> => {
       headers['Authorization'] = `Bearer ${config.apiKey}`;
     }
 
-    const enhancedPrompt = `${prompt}\n\nIMPORTANT: You MUST respond strictly with valid JSON that matches this schema: ${JSON.stringify(schema)}. Do not include any markdown formatting or extra text.`;
+    const enhancedPrompt = `${prompt}\n\nIMPORTANT: You MUST respond strictly with valid JSON that matches this schema: ${JSON.stringify(schema)}. Do not include any markdown formatting or extra text. Output only the JSON.`;
 
-    const body: any = isOllama ? {
-      model: config.selectedModel,
-      prompt: enhancedPrompt,
-      stream: false,
-      format: "json"
-    } : {
-      model: config.selectedModel,
-      messages: [{ role: 'user', content: enhancedPrompt }],
-      response_format: { type: "json_object" }
-    };
+    let body: any;
+    if (isOllama) {
+      body = {
+        model: config.selectedModel,
+        prompt: enhancedPrompt,
+        stream: false,
+        format: "json"
+      };
+    } else if (isCloudflare) {
+      body = {
+        prompt: enhancedPrompt
+      };
+    } else {
+      // OpenAI-compatible providers (Deepseek, OpenRouter, Mistral, OpenAI)
+      body = {
+        model: config.selectedModel,
+        messages: [{ role: 'user', content: enhancedPrompt }],
+        response_format: { type: "json_object" }
+      };
+    }
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -95,11 +113,24 @@ const requestAI = async (prompt: string, schema: any): Promise<any> => {
     let resultString = "";
     if (isOllama) {
       resultString = data.response;
+    } else if (isCloudflare) {
+      // Cloudflare results usually in .result.response
+      resultString = data.result?.response || data.response || "";
     } else {
+      // OpenAI standard
       resultString = data.choices?.[0]?.message?.content || "";
     }
 
-    return JSON.parse(resultString.trim());
+    // Attempt to extract JSON if the model included extra text (though we asked not to)
+    const jsonMatch = resultString.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    const finalString = jsonMatch ? jsonMatch[0] : resultString;
+
+    try {
+        return JSON.parse(finalString.trim());
+    } catch (e) {
+        console.error("JSON Parse Error. Raw string:", resultString);
+        throw new Error("Failed to parse AI response as JSON.");
+    }
   }
 };
 

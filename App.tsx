@@ -39,6 +39,24 @@ const DEFAULT_API_SETTINGS: ApiSettings = {
       apiKey: '',
       selectedModel: '',
       availableModels: []
+    },
+    cloudflare: {
+      baseUrl: '',
+      apiKey: '',
+      selectedModel: '',
+      availableModels: []
+    },
+    deepseek: {
+      baseUrl: 'https://api.deepseek.com',
+      apiKey: '',
+      selectedModel: '',
+      availableModels: []
+    },
+    openrouter: {
+      baseUrl: 'https://openrouter.ai/api/v1',
+      apiKey: '',
+      selectedModel: '',
+      availableModels: []
     }
   }
 };

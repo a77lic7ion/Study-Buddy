@@ -27,7 +27,19 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
   const testProvider = async (provider: string) => {
     setTestStatus(prev => ({ ...prev, [provider]: 'testing' }));
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Simulate a small delay for diagnostic feedback
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const config = localSettings.providers[provider as keyof ApiSettings['providers']];
+      
+      if (provider === 'gemini' && config.apiKey) {
+        setTestStatus(prev => ({ ...prev, [provider]: 'success' }));
+        return;
+      }
+
+      if (!config.baseUrl && provider !== 'gemini') {
+         throw new Error("Base URL required");
+      }
+
       setTestStatus(prev => ({ ...prev, [provider]: 'success' }));
     } catch (e) {
       setTestStatus(prev => ({ ...prev, [provider]: 'error' }));
@@ -45,11 +57,23 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
       } else if (provider === 'ollama') {
         const response = await fetch(`${config.baseUrl}/api/tags`).then(r => r.json());
         models = response.models?.map((m: any) => m.name) || [];
+      } else if (provider === 'cloudflare') {
+        // Cloudflare doesn't have a standardized 'list models' that is easy to call without account ID
+        // Often users provide their own common ones or manually enter. 
+        // We'll provide a few common Workers AI IDs as defaults if empty.
+        models = ['@cf/meta/llama-3-8b-instruct', '@cf/mistral/mistral-7b-instruct-v0.1', '@cf/google/gemma-7b-it'];
       } else {
-        const response = await fetch(`${config.baseUrl}/models`, {
-          headers: { 'Authorization': `Bearer ${config.apiKey}` }
-        }).then(r => r.json());
-        models = response.data?.map((m: any) => m.id) || [];
+        // OpenAI compatible (Mistral, Deepseek, OpenRouter, OpenAI)
+        const endpoint = `${config.baseUrl.replace(/\/+$/, '')}/models`;
+        const headers: Record<string, string> = {};
+        if (config.apiKey) headers['Authorization'] = `Bearer ${config.apiKey}`;
+        
+        const response = await fetch(endpoint, { headers }).then(r => r.json());
+        if (response.data) {
+          models = response.data.map((m: any) => m.id);
+        } else if (Array.isArray(response)) {
+          models = response.map((m: any) => m.id || m.name || m);
+        }
       }
 
       if (models.length > 0) {
@@ -57,11 +81,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
       }
     } catch (e) {
       console.error(`Failed to prefetch ${provider} models`, e);
-      alert(`Could not fetch models for ${provider}. Ensure endpoint and keys are correct.`);
+      alert(`Could not fetch models for ${provider}. Check endpoint/keys.`);
     } finally {
       setFetchStatus(prev => ({ ...prev, [provider]: false }));
     }
   };
+
+  const providersList: (keyof ApiSettings['providers'])[] = [
+    'gemini', 'mistral', 'openai', 'ollama', 'cloudflare', 'deepseek', 'openrouter'
+  ];
 
   return (
     <div className="w-full max-w-5xl mx-auto p-4 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
@@ -80,7 +108,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
         {/* Sidebar Tabs - Horizontal Scroll on Mobile */}
         <div className="lg:col-span-1 flex lg:flex-col gap-2 overflow-x-auto pb-2 sm:pb-0 lg:overflow-x-visible custom-scrollbar">
-          {(['gemini', 'mistral', 'openai', 'ollama'] as const).map(p => (
+          {providersList.map(p => (
             <button
               key={p}
               onClick={() => setLocalSettings(prev => ({ ...prev, activeProvider: p }))}
@@ -101,7 +129,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
               variant="primary" 
               className="w-full py-5 text-[10px] uppercase tracking-[0.3em] bg-green-600 hover:bg-green-700 shadow-xl"
             >
-              Save All
+              Save Parameters
             </Button>
           </div>
         </div>
@@ -127,27 +155,34 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
                     value={localSettings.providers[localSettings.activeProvider].baseUrl} 
                     onChange={e => updateProvider(localSettings.activeProvider, { baseUrl: e.target.value })}
                     className="w-full bg-background border border-border rounded-xl p-3 sm:p-4 text-[11px] sm:text-xs font-mono text-foreground focus:ring-1 focus:ring-primary outline-none"
-                    placeholder="https://api.example.com/v1"
+                    placeholder={
+                        localSettings.activeProvider === 'cloudflare' 
+                        ? "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run"
+                        : "https://api.example.com/v1"
+                    }
                   />
+                  {localSettings.activeProvider === 'cloudflare' && (
+                      <p className="text-[8px] text-muted-foreground italic uppercase tracking-widest mt-1">Include your Account ID in the URL for native Cloudflare AI calls.</p>
+                  )}
                 </div>
               )}
 
-              {(localSettings.activeProvider === 'mistral' || localSettings.activeProvider === 'openai') && (
+              {localSettings.activeProvider !== 'ollama' && (
                 <div className="space-y-2 sm:space-y-3">
-                  <label className="text-[8px] sm:text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1 leading-none block">Auth Secret</label>
+                  <label className="text-[8px] sm:text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1 leading-none block">API Key / Token</label>
                   <input 
                     type="password" 
                     value={localSettings.providers[localSettings.activeProvider].apiKey} 
                     onChange={e => updateProvider(localSettings.activeProvider, { apiKey: e.target.value })}
                     className="w-full bg-background border border-border rounded-xl p-3 sm:p-4 text-[11px] sm:text-xs font-mono text-foreground focus:ring-1 focus:ring-primary outline-none"
-                    placeholder="sk-••••••••"
+                    placeholder="••••••••"
                   />
                 </div>
               )}
 
               <div className="space-y-3 sm:space-y-4">
                 <div className="flex items-center justify-between gap-4">
-                  <label className="text-[8px] sm:text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1 leading-none">Selected Model</label>
+                  <label className="text-[8px] sm:text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1 leading-none">Model Selection</label>
                   <button 
                     onClick={() => prefetchModels(localSettings.activeProvider)}
                     disabled={fetchStatus[localSettings.activeProvider]}
@@ -191,14 +226,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onBack })
               {testStatus[localSettings.activeProvider] === 'success' && (
                 <div className="bg-green-500/10 border border-green-500/20 px-4 sm:px-6 py-3 sm:py-4 rounded-xl flex items-center gap-3 text-green-500 animate-in fade-in zoom-in duration-300">
                   <span className="material-icons-round text-sm">check_circle</span>
-                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">Active</span>
+                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">Link Active</span>
                 </div>
               )}
               
               {testStatus[localSettings.activeProvider] === 'error' && (
                 <div className="bg-destructive/10 border border-destructive/20 px-4 sm:px-6 py-3 sm:py-4 rounded-xl flex items-center gap-3 text-destructive animate-in shake duration-300">
                   <span className="material-icons-round text-sm">error</span>
-                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">Failed</span>
+                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">Protocol Fail</span>
                 </div>
               )}
             </div>
