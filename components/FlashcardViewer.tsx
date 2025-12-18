@@ -25,6 +25,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
   const [isFlipped, setIsFlipped] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
   const [testScore, setTestScore] = useState(0);
+  const [cardsEvaluated, setCardsEvaluated] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -62,6 +63,8 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
       setCurrentIndex(0);
       setIsFlipped(false);
       setShowAnswer(false);
+      setTestScore(0);
+      setCardsEvaluated(0);
       setSelectedOption(null);
       localStorage.setItem(persistenceKey, JSON.stringify({ cards: aiCards, index: 0 }));
     } catch (e) {
@@ -75,31 +78,36 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
   const handleCardChange = (newIndex: number) => {
     if (isTransitioning) return;
     setIsTransitioning(true);
-    
-    // Smooth exit then data swap
     setTimeout(() => {
       setCurrentIndex(newIndex);
       setIsFlipped(false);
       setShowAnswer(false);
       setSelectedOption(null);
-      
-      // Allow a small delay for state to settle before showing new card
-      setTimeout(() => {
-        setIsTransitioning(false);
-      }, 50);
+      setTimeout(() => setIsTransitioning(false), 50);
     }, 250);
   };
 
   const nextCard = () => {
     if (currentIndex < cards.length - 1) {
       handleCardChange(currentIndex + 1);
+    } else {
+      finalizeSession();
     }
   };
 
   const prevCard = () => {
-    if (currentIndex > 0) {
-      handleCardChange(currentIndex - 1);
+    if (currentIndex > 0) handleCardChange(currentIndex - 1);
+  };
+
+  const finalizeSession = () => {
+    if (cardsEvaluated === 0) {
+      onBack();
+      return;
     }
+    const finalScore = Math.round((testScore / cardsEvaluated) * 100);
+    onTestComplete(finalScore);
+    localStorage.removeItem(persistenceKey);
+    onBack();
   };
 
   const handleTestAnswer = (knewIt: boolean) => {
@@ -109,25 +117,17 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
     } else {
       playIncorrectSound();
     }
-
-    if (currentIndex < cards.length - 1) {
-      nextCard();
-    } else {
-      onTestComplete(Math.round(((knewIt ? testScore + 1 : testScore) / cards.length) * 100));
-      localStorage.removeItem(persistenceKey);
-      onBack();
-    }
+    setCardsEvaluated(e => e + 1);
+    nextCard();
   };
 
   const handleMCOptionSelect = (opt: string) => {
     if (selectedOption || !isTestMode) return;
     setSelectedOption(opt);
     const isCorrect = opt === cards[currentIndex].definition;
-    
-    // Show answer logic
     setIsFlipped(true);
     setShowAnswer(true);
-
+    setCardsEvaluated(e => e + 1);
     if (isCorrect) {
       playCorrectSound();
       setTestScore(s => s + 1);
@@ -138,41 +138,26 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
 
   const handleSkip = () => {
     if (isTransitioning) return;
-    if (currentIndex < cards.length - 1) {
-      nextCard();
-    } else {
-      // Finish without scoring the last card
-      onTestComplete(Math.round((testScore / cards.length) * 100));
-      localStorage.removeItem(persistenceKey);
-      onBack();
-    }
+    nextCard();
   };
 
   if (preSetup) {
     return (
-      <div className="w-full max-w-md bg-card border border-border rounded-lg shadow-2xl p-10 animate-in zoom-in duration-300">
+      <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-10 animate-in zoom-in duration-300">
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 bg-secondary rounded-lg flex items-center justify-center mb-5 text-primary ring-1 ring-border shadow-sm">
             <span className="material-icons-round text-3xl">psychology</span>
           </div>
-          <h2 className="text-2xl font-bold mb-2">Configure Deck</h2>
-          <p className="text-sm text-muted-foreground font-medium text-center italic">Calibrating difficulty for {profile.subject}...</p>
+          <h2 className="text-2xl font-black uppercase italic italic">Neural Forge</h2>
+          <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1">Calibrating difficulty for {profile.subject}</p>
         </div>
         
         <div className="space-y-6">
           <div className="space-y-3">
-            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest ml-1">Complexity Level</label>
+            <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Complexity Level</label>
             <div className="grid grid-cols-3 gap-2">
               {(['Easy', 'Medium', 'Hard'] as Difficulty[]).map((level) => (
-                <button
-                  key={level}
-                  onClick={() => setDifficulty(level)}
-                  className={`py-3 rounded-lg border font-bold text-[10px] uppercase transition-all tracking-wider ${
-                    difficulty === level 
-                      ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20' 
-                      : 'bg-background border-border text-muted-foreground hover:border-primary/50'
-                  }`}
-                >
+                <button key={level} onClick={() => setDifficulty(level)} className={`py-3 rounded-xl border font-black text-[9px] uppercase transition-all tracking-wider ${difficulty === level ? 'bg-primary border-primary text-primary-foreground shadow-lg' : 'bg-background border-border text-muted-foreground hover:border-primary/50'}`}>
                   {level}
                 </button>
               ))}
@@ -180,18 +165,10 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
           </div>
 
           <div className="space-y-3">
-            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest ml-1">Batch Size</label>
+            <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Forge Count</label>
             <div className="grid grid-cols-3 gap-2">
               {([10, 25, 40] as CardCount[]).map((count) => (
-                <button
-                  key={count}
-                  onClick={() => setCardCount(count)}
-                  className={`py-3 rounded-lg border font-bold text-[10px] uppercase transition-all tracking-wider ${
-                    cardCount === count 
-                      ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20' 
-                      : 'bg-background border-border text-muted-foreground hover:border-primary/50'
-                  }`}
-                >
+                <button key={count} onClick={() => setCardCount(count)} className={`py-3 rounded-xl border font-black text-[9px] uppercase transition-all tracking-wider ${cardCount === count ? 'bg-primary border-primary text-primary-foreground shadow-lg' : 'bg-background border-border text-muted-foreground hover:border-primary/50'}`}>
                   {count} Cards
                 </button>
               ))}
@@ -199,12 +176,8 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
           </div>
 
           <div className="flex flex-col gap-3 pt-4">
-            <Button onClick={startSession} size="lg" className="w-full text-xs tracking-[0.2em]">
-              GENERATE NEURAL DECK
-            </Button>
-            <Button onClick={onBack} variant="ghost" className="w-full text-xs tracking-widest">
-              RETURN HOME
-            </Button>
+            <Button onClick={startSession} size="lg" className="w-full text-[10px] uppercase tracking-[0.3em]">GENERATE NEURAL DECK</Button>
+            <Button onClick={onBack} variant="ghost" className="w-full text-[10px] uppercase tracking-widest">RETURN HOME</Button>
           </div>
         </div>
       </div>
@@ -214,7 +187,7 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
   if (loading) return (
     <div className="flex flex-col items-center animate-in fade-in duration-700">
       <LoadingSpinner />
-      <p className="mt-8 font-bold text-primary animate-pulse tracking-widest text-[10px] uppercase">Synthesizing Learning Assets...</p>
+      <p className="mt-8 font-black text-primary animate-pulse tracking-widest text-[10px] uppercase">Synthesizing Learning Assets...</p>
     </div>
   );
 
@@ -223,7 +196,6 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
 
   return (
     <div className="w-full max-w-xl mx-auto flex flex-col items-center animate-in fade-in slide-in-from-bottom-6 duration-700">
-      {/* Session Metadata */}
       <div className="w-full mb-8 flex items-center justify-between px-2">
         <div className="flex flex-col">
           <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-1">
@@ -231,17 +203,16 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
           </span>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>
-            <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">Target: {difficulty}</span>
+            <span className="text-[9px] text-muted-foreground font-black uppercase tracking-widest">Target: {difficulty} • Mastery: {cardsEvaluated > 0 ? Math.round((testScore/cardsEvaluated)*100) : 0}%</span>
           </div>
         </div>
-        <div className="bg-secondary/80 backdrop-blur-sm px-4 py-2 rounded-lg border border-border shadow-inner">
-          <span className="text-[10px] font-bold tracking-[0.2em] font-mono">
+        <div className="bg-secondary/80 backdrop-blur-sm px-4 py-2 rounded-xl border border-border shadow-inner">
+          <span className="text-[10px] font-black tracking-[0.2em] font-mono">
             {currentIndex + 1} <span className="text-muted-foreground">/</span> {cards.length}
           </span>
         </div>
       </div>
 
-      {/* Main Flashcard Area */}
       <div className="w-full mb-10 group" style={{ perspective: '2000px' }}>
         <div 
           className={`relative w-full h-[22rem] transition-all duration-700 ease-out preserve-3d cursor-pointer 
@@ -249,145 +220,85 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ profile, userId, onBa
             ${isTransitioning ? 'opacity-0 scale-95 -translate-y-4' : 'opacity-100 scale-100 translate-y-0'}`}
           onClick={() => !isTransitioning && !isMultipleChoice && setIsFlipped(!isFlipped)}
         >
-          {/* Front: Question Side */}
-          <div 
-            className={`absolute inset-0 bg-card border border-border rounded-xl shadow-2xl flex flex-col items-center justify-center p-12 text-center backface-hidden ring-1 ring-white/5 transition-opacity duration-300
-              ${isFlipped ? 'opacity-0' : 'opacity-100'}`}
-            style={{ zIndex: isFlipped ? 0 : 1 }}
-          >
+          <div className={`absolute inset-0 bg-card border border-border rounded-2xl shadow-2xl flex flex-col items-center justify-center p-12 text-center backface-hidden ring-1 ring-white/5 transition-opacity duration-300 ${isFlipped ? 'opacity-0' : 'opacity-100'}`} style={{ zIndex: isFlipped ? 0 : 1 }}>
              <div className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-secondary border border-border rounded-full shadow-sm">
                <span className="text-[8px] font-black uppercase tracking-[0.3em] text-muted-foreground">{isMultipleChoice ? 'CHALLENGE' : 'QUESTION'}</span>
              </div>
-             <div className="absolute bottom-6 right-8 opacity-5 select-none pointer-events-none">
-                <span className="material-icons-round text-8xl">contact_support</span>
-             </div>
-             <h2 className="text-xl md:text-2xl font-bold leading-tight text-foreground relative z-10 antialiased">
-                {currentCard?.term}
-             </h2>
+             <h2 className="text-xl md:text-2xl font-black leading-tight text-foreground italic antialiased">{currentCard?.term}</h2>
           </div>
-
-          {/* Back: Answer Side */}
-          <div 
-            className={`absolute inset-0 bg-primary/5 border border-primary/20 rounded-xl shadow-2xl flex flex-col items-center justify-center p-12 text-center backface-hidden [transform:rotateY(180deg)] ring-1 ring-primary/20 transition-opacity duration-300
-              ${isFlipped ? 'opacity-100' : 'opacity-0'}`}
-            style={{ zIndex: isFlipped ? 1 : 0 }}
-          >
+          <div className={`absolute inset-0 bg-primary/5 border border-primary/20 rounded-2xl shadow-2xl flex flex-col items-center justify-center p-12 text-center backface-hidden [transform:rotateY(180deg)] ring-1 ring-primary/20 transition-opacity duration-300 ${isFlipped ? 'opacity-100' : 'opacity-0'}`} style={{ zIndex: isFlipped ? 1 : 0 }}>
              <div className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-primary/20 border border-primary/30 rounded-full shadow-sm">
                <span className="text-[8px] font-black uppercase tracking-[0.3em] text-primary">DEFINITION</span>
              </div>
-             <div className="absolute bottom-6 left-8 opacity-5 select-none pointer-events-none">
-                <span className="material-icons-round text-8xl">auto_awesome</span>
-             </div>
-             <p className="text-base md:text-lg font-medium leading-relaxed text-foreground relative z-10 antialiased max-w-sm">
-                {currentCard?.definition}
-             </p>
+             <p className="text-base md:text-lg font-bold leading-relaxed text-foreground antialiased max-w-sm">{currentCard?.definition}</p>
           </div>
         </div>
       </div>
 
-      {/* Multiple Choice Options (Rendered separately below card if in test mode) */}
       {isTestMode && isMultipleChoice && !selectedOption && !isTransitioning && (
         <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8 animate-in slide-in-from-bottom-4 duration-300">
           {currentCard.options?.map((opt, i) => (
-            <button
-              key={i}
-              onClick={() => handleMCOptionSelect(opt)}
-              className="p-4 bg-card border border-border rounded-lg text-left text-xs font-bold hover:border-primary hover:bg-primary/5 transition-all active:scale-[0.98] shadow-sm"
-            >
+            <button key={i} onClick={() => handleMCOptionSelect(opt)} className="p-5 bg-card border border-border rounded-xl text-left text-[11px] font-black uppercase tracking-wider hover:border-primary hover:bg-primary/5 transition-all shadow-sm">
               {opt}
             </button>
           ))}
         </div>
       )}
 
-      {/* Control Interface */}
       <div className="w-full space-y-6">
         {isTestMode ? (
-          <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
+          <div className="space-y-4">
             {isMultipleChoice ? (
               selectedOption ? (
                 <div className="space-y-4">
-                  <div className={`p-4 rounded-lg border flex items-center justify-between ${selectedOption === currentCard.definition ? 'bg-green-500/10 border-green-500/30 text-green-500' : 'bg-destructive/10 border-destructive/30 text-destructive'}`}>
+                  <div className={`p-5 rounded-xl border flex items-center justify-between ${selectedOption === currentCard.definition ? 'bg-green-500/10 border-green-500/30 text-green-500 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'bg-destructive/10 border-destructive/30 text-destructive'}`}>
                     <span className="text-[10px] font-black uppercase tracking-widest">{selectedOption === currentCard.definition ? 'CORRECT RECALL' : 'INCORRECT'}</span>
                     <span className="material-icons-round">{selectedOption === currentCard.definition ? 'check_circle' : 'cancel'}</span>
                   </div>
                   <Button onClick={nextCard} size="lg" className="w-full py-5 text-[10px] uppercase tracking-[0.3em]">CONTINUE MODULE</Button>
                 </div>
               ) : (
-                <Button onClick={handleSkip} variant="ghost" className="w-full py-4 text-[9px] uppercase tracking-widest border-border opacity-70 hover:opacity-100">
-                  SKIP CARD
-                </Button>
+                <Button onClick={handleSkip} variant="ghost" className="w-full py-4 text-[9px] uppercase tracking-widest border-border opacity-70">SKIP CARD</Button>
               )
             ) : (
               !showAnswer ? (
                 <div className="flex flex-col gap-3">
-                  <Button onClick={() => {setShowAnswer(true); setIsFlipped(true);}} size="lg" className="w-full py-5 text-[10px] uppercase tracking-[0.3em] bg-white text-black hover:bg-white/90 shadow-xl">
-                    REVEAL ANSWER
-                  </Button>
-                  <Button onClick={handleSkip} variant="ghost" className="w-full py-4 text-[9px] uppercase tracking-widest border-border opacity-70 hover:opacity-100">
-                    SKIP CARD
-                  </Button>
+                  <Button onClick={() => {setShowAnswer(true); setIsFlipped(true);}} size="lg" className="w-full py-5 text-[10px] uppercase tracking-[0.3em] bg-white text-black hover:bg-white/90 shadow-xl">REVEAL ANSWER</Button>
+                  <Button onClick={handleSkip} variant="ghost" className="w-full py-4 text-[9px] uppercase tracking-widest border-border">SKIP CARD</Button>
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <Button onClick={() => handleTestAnswer(true)} variant="primary" className="py-5 text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-primary/20">
-                      CORRECT RECALL
-                    </Button>
-                    <Button onClick={() => handleTestAnswer(false)} variant="secondary" className="py-5 text-[10px] uppercase tracking-[0.2em]">
-                      NEEDS REVIEW
-                    </Button>
+                    <Button onClick={() => handleTestAnswer(true)} variant="primary" className="py-5 text-[10px] uppercase tracking-[0.2em] bg-green-600 hover:bg-green-500 shadow-lg shadow-green-500/20">CORRECT RECALL</Button>
+                    <Button onClick={() => handleTestAnswer(false)} variant="secondary" className="py-5 text-[10px] uppercase tracking-[0.2em] border-destructive/30 text-destructive hover:bg-destructive/5">NEEDS REVIEW</Button>
                   </div>
-                  <Button onClick={handleSkip} variant="ghost" className="w-full py-4 text-[9px] uppercase tracking-widest border-border opacity-70 hover:opacity-100">
-                    SKIP CARD
-                  </Button>
+                  <Button onClick={handleSkip} variant="ghost" className="w-full py-4 text-[9px] uppercase tracking-widest border-border opacity-70">SKIP CARD</Button>
                 </div>
               )
             )}
           </div>
         ) : (
-          <div className="bg-secondary/40 border border-border p-4 rounded-xl flex items-center justify-between backdrop-blur-md shadow-lg">
-            <button 
-              onClick={prevCard} 
-              disabled={currentIndex === 0 || isTransitioning} 
-              className="p-3 text-muted-foreground hover:text-primary transition-all disabled:opacity-20 active:scale-90"
-            >
-              <span className="material-icons-round">arrow_back_ios_new</span>
-            </button>
+          <div className="bg-secondary/40 border border-border p-5 rounded-2xl flex items-center justify-between backdrop-blur-md shadow-lg">
+            <button onClick={prevCard} disabled={currentIndex === 0 || isTransitioning} className="p-3 text-muted-foreground hover:text-primary transition-all disabled:opacity-20 active:scale-90"><span className="material-icons-round">arrow_back_ios_new</span></button>
             <div className="flex flex-col items-center gap-3">
-              <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-[0.3em]">PROGRESS INDEX</span>
+              <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.3em]">PROGRESS INDEX</span>
               <div className="flex gap-1.5">
                 {cards.map((_, i) => (
                   <div key={i} className={`h-1 rounded-full transition-all duration-700 ${i === currentIndex ? 'bg-primary w-8 shadow-[0_0_8px_rgba(99,102,241,0.6)]' : 'bg-border w-1.5'}`}></div>
                 ))}
               </div>
             </div>
-            <button 
-              onClick={nextCard} 
-              disabled={currentIndex === cards.length - 1 || isTransitioning} 
-              className="p-3 text-muted-foreground hover:text-primary transition-all disabled:opacity-20 active:scale-90"
-            >
-              <span className="material-icons-round">arrow_forward_ios</span>
-            </button>
+            <button onClick={nextCard} disabled={currentIndex === cards.length - 1 || isTransitioning} className="p-3 text-muted-foreground hover:text-primary transition-all disabled:opacity-20 active:scale-90"><span className="material-icons-round">arrow_forward_ios</span></button>
           </div>
         )}
 
-        {/* Global Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Button onClick={onBack} variant="ghost" className="text-[9px] uppercase tracking-widest border-border hover:border-destructive/30 hover:text-destructive">
-            EXIT SESSION
-          </Button>
-          <Button onClick={() => setPreSetup(true)} variant="ghost" className="text-[9px] uppercase tracking-widest border-border">
-            CONFIGURE NEW
-          </Button>
+          <Button onClick={finalizeSession} variant="ghost" className="text-[9px] uppercase tracking-widest border-border text-destructive hover:bg-destructive/10">END & SAVE SESSION</Button>
+          <Button onClick={() => setPreSetup(true)} variant="ghost" className="text-[9px] uppercase tracking-widest border-border">NEW BATCH</Button>
           {isTestMode ? (
-            <Button onClick={() => setIsTestMode(false)} variant="secondary" className="text-[9px] uppercase tracking-widest border-border shadow-sm">
-              PRACTICE MODE
-            </Button>
+            <Button onClick={() => setIsTestMode(false)} variant="secondary" className="text-[9px] uppercase tracking-widest border-border">PRACTICE MODE</Button>
           ) : (
-            <Button onClick={() => setIsTestMode(true)} variant="secondary" className="text-[9px] uppercase tracking-widest border-primary/20 text-primary bg-primary/5 hover:bg-primary/10 shadow-lg shadow-primary/5">
-              ACTIVE RECALL
-            </Button>
+            <Button onClick={() => setIsTestMode(true)} variant="secondary" className="text-[9px] uppercase tracking-widest border-primary/20 text-primary bg-primary/5 hover:bg-primary/10">ACTIVE RECALL</Button>
           )}
         </div>
       </div>

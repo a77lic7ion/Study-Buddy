@@ -17,7 +17,6 @@ const App: React.FC = () => {
   const [testScores, setTestScores] = useState<TestResult[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(true);
 
-  // Safe localStorage getter
   const getStoredItem = (key: string) => {
     try {
       return localStorage.getItem(key);
@@ -28,7 +27,6 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    // Initial theme setup
     const storedTheme = getStoredItem('theme');
     const darkMode = storedTheme === null ? true : storedTheme === 'dark';
     setIsDarkMode(darkMode);
@@ -47,10 +45,7 @@ const App: React.FC = () => {
         setCurrentUser(user);
         setCurrentView(user.profile ? AppView.HOME : AppView.SETUP);
       } catch (e) {
-        console.error("Corrupted user data found, resetting...", e);
-        try {
-          localStorage.removeItem('currentUser');
-        } catch (err) {}
+        localStorage.removeItem('currentUser');
         setCurrentView(AppView.AUTH);
       }
     } else if (hasSeenIntro) {
@@ -61,51 +56,27 @@ const App: React.FC = () => {
     if (storedScoresRaw) {
       try {
         setTestScores(JSON.parse(storedScoresRaw));
-      } catch (e) {
-        console.error("Corrupted scores data found", e);
-      }
+      } catch (e) {}
     }
   }, []);
 
   const toggleTheme = () => {
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
-    try {
-      localStorage.setItem('theme', newMode ? 'dark' : 'light');
-    } catch (e) {}
-    if (newMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  };
-
-  const handleIntroComplete = () => {
-    try {
-      localStorage.setItem('hasSeenIntro', 'true');
-    } catch (e) {}
-    setCurrentView(AppView.AUTH);
+    localStorage.setItem('theme', newMode ? 'dark' : 'light');
+    if (newMode) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
   };
 
   const handleAuthComplete = (user: User) => {
     setCurrentUser(user);
-    try {
-      localStorage.setItem('currentUser', JSON.stringify(user));
-    } catch (e: any) {
-      console.error("Failed to persist session", e);
-      // Even if persistence fails, we let them into the app for the current session
-      if (e.name?.includes('Quota') || e.message?.includes('quota')) {
-        alert("Warning: Browser storage is full. Your progress might not be saved across reloads.");
-      }
-    }
+    localStorage.setItem('currentUser', JSON.stringify(user));
     setCurrentView(user.profile ? AppView.HOME : AppView.SETUP);
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    try {
-      localStorage.removeItem('currentUser');
-    } catch (e) {}
+    localStorage.removeItem('currentUser');
     setCurrentView(AppView.AUTH);
   };
 
@@ -113,35 +84,8 @@ const App: React.FC = () => {
     if (!currentUser) return;
     const updatedUser = { ...currentUser, profile };
     setCurrentUser(updatedUser);
-    
-    try {
-      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-      const usersRaw = getStoredItem('users');
-      const users = usersRaw ? JSON.parse(usersRaw) : [];
-      const index = users.findIndex((u: User) => u.id === updatedUser.id);
-      if (index !== -1) {
-        users[index] = updatedUser;
-        localStorage.setItem('users', JSON.stringify(users));
-      }
-    } catch (e) {
-      console.error("Setup persistence failed", e);
-    }
-
+    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
     setCurrentView(AppView.HOME);
-  };
-
-  const handleUserUpdate = (updatedUser: User) => {
-    setCurrentUser(updatedUser);
-    try {
-      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-      const usersRaw = getStoredItem('users');
-      const users = usersRaw ? JSON.parse(usersRaw) : [];
-      const index = users.findIndex((u: User) => u.id === updatedUser.id);
-      if (index !== -1) {
-        users[index] = updatedUser;
-        localStorage.setItem('users', JSON.stringify(users));
-      }
-    } catch (e) {}
   };
 
   const handleTestComplete = useCallback((score: number, type: 'quiz' | 'flashcard') => {
@@ -158,9 +102,7 @@ const App: React.FC = () => {
 
     setTestScores(prev => {
       const updated = [...prev, newScore];
-      try {
-        localStorage.setItem('testScores', JSON.stringify(updated));
-      } catch (e) {}
+      localStorage.setItem('testScores', JSON.stringify(updated));
       return updated;
     });
   }, [currentUser]);
@@ -168,15 +110,18 @@ const App: React.FC = () => {
   const userScores = testScores.filter(s => s.userId === currentUser?.id);
   const subjectScores = userScores.filter(s => s.subject === currentUser?.profile?.subject);
 
+  // Calculate stats for all practiced subjects
+  const subjectSummaries = userScores.reduce((acc: any, curr) => {
+    if (!acc[curr.subject]) acc[curr.subject] = { total: 0, count: 0, best: 0 };
+    acc[curr.subject].total += curr.score;
+    acc[curr.subject].count += 1;
+    acc[curr.subject].best = Math.max(acc[curr.subject].best, curr.score);
+    return acc;
+  }, {});
+
   const renderContent = () => {
-    if (currentView === AppView.INTRO) {
-      return <IntroSequence onComplete={handleIntroComplete} />;
-    }
-
-    if (currentView === AppView.AUTH) {
-      return <AuthView onAuthComplete={handleAuthComplete} />;
-    }
-
+    if (currentView === AppView.INTRO) return <IntroSequence onComplete={() => setCurrentView(AppView.AUTH)} />;
+    if (currentView === AppView.AUTH) return <AuthView onAuthComplete={handleAuthComplete} />;
     if (!currentUser) return null;
 
     switch (currentView) {
@@ -187,78 +132,72 @@ const App: React.FC = () => {
       case AppView.QUIZ:
         return <Quiz profile={currentUser.profile!} userId={currentUser.id} onBack={() => setCurrentView(AppView.HOME)} onTestComplete={(s) => handleTestComplete(s, 'quiz')} />;
       case AppView.PROFILE:
-        return <ProfileView user={currentUser} scores={userScores} onBack={() => setCurrentView(AppView.HOME)} onUpdateUser={handleUserUpdate} onOpenReportCard={() => setCurrentView(AppView.REPORT_CARD)} />;
+        return <ProfileView user={currentUser} scores={userScores} onBack={() => setCurrentView(AppView.HOME)} onUpdateUser={(u) => {setCurrentUser(u); localStorage.setItem('currentUser', JSON.stringify(u));}} onOpenReportCard={() => setCurrentView(AppView.REPORT_CARD)} />;
       case AppView.REPORT_CARD:
         return <ReportCardView user={currentUser} scores={userScores} onBack={() => setCurrentView(AppView.PROFILE)} />;
       case AppView.HOME:
       default:
         return (
-          <div className="w-full max-w-4xl mx-auto space-y-12 animate-in fade-in zoom-in duration-500">
-            <div className="text-center relative">
-              <h1 className="text-4xl md:text-6xl font-black text-foreground mb-4 tracking-tighter">
-                FORGE YOUR <span className="text-primary">MASTERY</span>
+          <div className="w-full max-w-4xl mx-auto space-y-8 animate-in fade-in zoom-in duration-500">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <h1 className="text-4xl md:text-6xl font-black text-foreground tracking-tighter uppercase italic">
+                MASTERY <span className="text-primary italic">COMMAND</span>
               </h1>
-              <div className="flex justify-center items-center gap-3">
-                <span className="px-3 py-1 bg-secondary border border-border rounded-md text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                  {currentUser.profile?.grade}
-                </span>
-                <span className="px-3 py-1 bg-primary/10 border border-primary/20 rounded-md text-xs font-bold text-primary uppercase tracking-widest">
-                  {currentUser.profile?.subject}
+              <div className="flex flex-wrap justify-center gap-2">
+                <span className="px-4 py-1.5 bg-primary/10 border border-primary/20 rounded-full text-[10px] font-black text-primary uppercase tracking-[0.2em] shadow-sm">
+                  {currentUser.profile?.grade} • {currentUser.profile?.subject}
                 </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <button 
-                onClick={() => setCurrentView(AppView.FLASHCARDS)}
-                className="group relative p-8 bg-card border border-border rounded-lg shadow-2xl overflow-hidden hover:border-primary/50 transition-all text-left"
-              >
-                <div className="absolute top-0 right-0 p-4 text-primary/20 group-hover:text-primary/40 transition-colors">
-                  <span className="material-icons-round text-6xl">style</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <button onClick={() => setCurrentView(AppView.FLASHCARDS)} className="group relative p-10 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden hover:border-primary/50 transition-all text-left">
+                <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <span className="material-icons-round text-7xl">style</span>
                 </div>
-                <h3 className="text-2xl font-bold mb-2 group-hover:text-primary transition-colors">Neural Forge</h3>
-                <p className="text-sm text-muted-foreground">Dynamic revision decks powered by adaptive intelligence.</p>
-                <div className="mt-6 flex items-center text-primary font-bold text-xs uppercase tracking-widest">
-                  Launch Module <span className="material-icons-round ml-2 text-sm">arrow_forward</span>
+                <h3 className="text-2xl font-black uppercase italic mb-3 group-hover:text-primary transition-colors">Neural Reciter</h3>
+                <p className="text-xs text-muted-foreground font-medium leading-relaxed max-w-xs">Forging deep conceptual recall via AI-synthesized card decks.</p>
+                <div className="mt-8 flex items-center text-primary font-black text-[10px] uppercase tracking-[0.3em]">
+                  Initialize Forge <span className="material-icons-round ml-2 text-sm">rocket_launch</span>
                 </div>
               </button>
 
-              <button 
-                onClick={() => setCurrentView(AppView.QUIZ)}
-                className="group relative p-8 bg-card border border-border rounded-lg shadow-2xl overflow-hidden hover:border-primary/50 transition-all text-left"
-              >
-                <div className="absolute top-0 right-0 p-4 text-primary/20 group-hover:text-primary/40 transition-colors">
-                  <span className="material-icons-round text-6xl">quiz</span>
+              <button onClick={() => setCurrentView(AppView.QUIZ)} className="group relative p-10 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden hover:border-primary/50 transition-all text-left">
+                <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <span className="material-icons-round text-7xl">bolt</span>
                 </div>
-                <h3 className="text-2xl font-bold mb-2 group-hover:text-primary transition-colors">Assessment Forge</h3>
-                <p className="text-sm text-muted-foreground">Real-time challenges that evolve with your learning path.</p>
-                <div className="mt-6 flex items-center text-primary font-bold text-xs uppercase tracking-widest">
-                  Begin Test <span className="material-icons-round ml-2 text-sm">arrow_forward</span>
+                <h3 className="text-2xl font-black uppercase italic mb-3 group-hover:text-primary transition-colors">Assessment Lab</h3>
+                <p className="text-xs text-muted-foreground font-medium leading-relaxed max-w-xs">Simulated environment for real-time proficiency benchmarking.</p>
+                <div className="mt-8 flex items-center text-primary font-black text-[10px] uppercase tracking-[0.3em]">
+                  Start Simulation <span className="material-icons-round ml-2 text-sm">sensors</span>
                 </div>
               </button>
             </div>
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
-                 <ProgressGraph scores={subjectScores.slice(-8)} />
+                 <ProgressGraph scores={subjectScores.slice(-10)} />
               </div>
-              <div className="bg-card border border-border p-8 rounded-lg shadow-2xl flex flex-col justify-center space-y-4">
-                <h3 className="text-lg font-bold text-foreground">Scholar Hub</h3>
-                <Button onClick={() => setCurrentView(AppView.PROFILE)} variant="secondary" className="w-full justify-start gap-3">
-                  <span className="material-icons-round text-sm">analytics</span>
-                  Analytics Dashboard
-                </Button>
-                <Button onClick={() => setCurrentView(AppView.SETUP)} variant="ghost" className="w-full justify-start gap-3">
-                  <span className="material-icons-round text-sm">settings</span>
-                  Update Target
-                </Button>
-                <div className="pt-4 border-t border-border mt-4">
-                  <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">System Status</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                    <span className="text-xs text-foreground font-medium">Forge Engine Online</span>
-                  </div>
+              <div className="bg-card border border-border p-8 rounded-2xl shadow-2xl flex flex-col space-y-6">
+                <h3 className="text-xs font-black uppercase text-muted-foreground tracking-[0.3em]">Neural Repository</h3>
+                <div className="flex flex-col gap-4 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                  {Object.keys(subjectSummaries).length > 0 ? Object.keys(subjectSummaries).map(s => {
+                    const stats = subjectSummaries[s];
+                    const avg = Math.round(stats.total / stats.count);
+                    return (
+                      <div key={s} className="p-3 bg-secondary/30 rounded-xl border border-border/50 flex justify-between items-center group cursor-pointer hover:bg-primary/5 transition-colors" onClick={() => handleSetupComplete({ ...currentUser.profile!, subject: s })}>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black uppercase text-foreground group-hover:text-primary transition-colors">{s}</span>
+                          <span className="text-[8px] text-muted-foreground font-bold">{stats.count} SESSIONS</span>
+                        </div>
+                        <span className={`text-xs font-black ${avg >= 80 ? 'text-green-500' : 'text-primary'}`}>{avg}%</span>
+                      </div>
+                    );
+                  }) : (
+                    <p className="text-[10px] text-muted-foreground font-bold italic py-4">Awaiting first session...</p>
+                  )}
                 </div>
+                <Button onClick={() => setCurrentView(AppView.SETUP)} variant="ghost" className="w-full text-[9px] uppercase tracking-widest py-4 mt-auto">Re-Initialize Target</Button>
               </div>
             </div>
           </div>
@@ -268,28 +207,13 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden bg-background">
-      {/* Decorative Blobs */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] -z-10 opacity-40 pointer-events-none transition-opacity duration-1000"></div>
-      <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px] -z-10 pointer-events-none"></div>
-
-      <Header 
-        user={currentUser}
-        onLogout={handleLogout} 
-        onProfile={() => setCurrentView(AppView.PROFILE)} 
-        onHome={() => setCurrentView(AppView.HOME)}
-        showNav={currentView !== AppView.INTRO}
-        isDarkMode={isDarkMode}
-        onToggleTheme={toggleTheme}
-      />
-      
-      <main className="flex-grow flex flex-col px-4 py-12 relative z-0">
-        <div className="w-full max-w-6xl mx-auto flex-grow flex items-center justify-center">
-          {renderContent()}
-        </div>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] -z-10 opacity-30 pointer-events-none"></div>
+      <Header user={currentUser} onLogout={handleLogout} onProfile={() => setCurrentView(AppView.PROFILE)} onHome={() => setCurrentView(AppView.HOME)} showNav={currentView !== AppView.INTRO} isDarkMode={isDarkMode} onToggleTheme={toggleTheme} />
+      <main className="flex-grow flex flex-col px-4 py-8 relative z-0">
+        <div className="w-full max-w-6xl mx-auto flex-grow flex items-center justify-center">{renderContent()}</div>
       </main>
-
-      <footer className="w-full py-6 text-center z-10 opacity-30">
-        <p className="text-[10px] text-muted-foreground font-bold tracking-[0.2em] uppercase">© 2024 NEUROFORGE • ADAPTIVE INTELLIGENCE ENGINE</p>
+      <footer className="w-full py-6 text-center opacity-20">
+        <p className="text-[9px] font-black tracking-[0.4em] uppercase">© 2024 NEUROFORGE • FORGING SUPERIOR SCHOLARS</p>
       </footer>
     </div>
   );
