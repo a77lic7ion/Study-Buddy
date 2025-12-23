@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import Button from './Button';
+import { GoogleLogin } from '@react-oauth/google';
+import { jwtDecode } from 'jwt-decode';
 
 interface AuthViewProps {
   onAuthComplete: (user: User) => void;
@@ -180,6 +182,43 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuthComplete }) => {
           {isLogin ? "Need a new account? " : "Already registered? "}
           <span className="font-bold text-primary">{isLogin ? 'Sign up' : 'Log in'}</span>
         </button>
+      </div>
+      <div className="mt-6 flex justify-center items-center">
+        <GoogleLogin
+          onSuccess={(credentialResponse) => {
+            const decoded: { email: string; name: string } = jwtDecode(
+              credentialResponse.credential!
+            );
+            let users: User[] = [];
+            const storedUsers = localStorage.getItem('users');
+            if (storedUsers) {
+              try {
+                users = JSON.parse(storedUsers);
+              } catch (e) {
+                users = [];
+              }
+            }
+            const normalizedEmail = decoded.email.toLowerCase().trim();
+            const user = users.find(
+              (u: any) => u.email.toLowerCase().trim() === normalizedEmail
+            );
+            if (user) {
+              onAuthComplete(user);
+            } else {
+              const newUser: User = {
+                id: Math.random().toString(36).substring(2, 11),
+                email: normalizedEmail,
+                password: '',
+              };
+              users.push(newUser);
+              localStorage.setItem('users', JSON.stringify(users));
+              onAuthComplete(newUser);
+            }
+          }}
+          onError={() => {
+            console.log('Login Failed');
+          }}
+        />
       </div>
     </div>
   );
