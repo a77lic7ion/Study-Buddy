@@ -115,8 +115,20 @@ const App: React.FC = () => {
     const storedSettingsRaw = getStoredItem('apiSettings');
     if (storedSettingsRaw) {
       try {
-        setApiSettings(JSON.parse(storedSettingsRaw));
-      } catch (e) {}
+        const storedSettings = JSON.parse(storedSettingsRaw);
+        // Deep merge providers to avoid crashes if new ones are added
+        const mergedProviders = { ...DEFAULT_API_SETTINGS.providers };
+        if (storedSettings.providers) {
+          for (const p in mergedProviders) {
+            if (storedSettings.providers[p]) {
+              mergedProviders[p] = { ...mergedProviders[p], ...storedSettings.providers[p] };
+            }
+          }
+        }
+        setApiSettings({ ...DEFAULT_API_SETTINGS, ...storedSettings, providers: mergedProviders });
+      } catch (e) {
+        // Fallback to default if parsing fails
+      }
     }
 
     // Listen for automatic failovers
