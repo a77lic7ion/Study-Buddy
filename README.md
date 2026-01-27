@@ -4,7 +4,8 @@
 
 NeuroForge is a high-performance educational platform designed for the modern scholar. It transforms static learning into a dynamic, adaptive experience using cutting-edge Generative AI to synthesize curriculum-specific content on the fly.
 
----
+<img width="1103" height="872" alt="image" src="https://github.com/user-attachments/assets/ebbe8ba4-3c8e-4ee1-b35c-a7153726490b" />
+
 
 ## 🌟 Core Features
 
